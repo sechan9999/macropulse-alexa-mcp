@@ -13,4 +13,6 @@ fredapi>=0.5.2
 pandas-datareader>=0.10.0
 google-cloud-bigquery>=3.20.0
 db-dtypes>=1.2.0
+mcp>=2.0.0
+boto3>=1.34.0
 
