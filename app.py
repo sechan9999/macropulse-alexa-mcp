@@ -1479,7 +1479,7 @@ Answer as a senior macro analyst using the data above."""
                 with st.spinner("Gemini is analyzing macro conditions..."):
                     client = genai.Client(api_key=gemini_key)
                     response = client.models.generate_content(
-                        model="gemini-2.0-flash",
+                        model="gemini-3.6-flash",
                         contents=prompts[analysis_type],
                         config=genai_types.GenerateContentConfig(
                             system_instruction=(
@@ -1501,7 +1501,7 @@ Answer as a senior macro analyst using the data above."""
                 """, unsafe_allow_html=True)
                 
                 st.markdown("---")
-                st.caption(f"Model: gemini-2.0-flash | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data through {df.index[-1].strftime('%B %Y')}")
+                st.caption(f"Model: gemini-3.6-flash | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data through {df.index[-1].strftime('%B %Y')}")
 
                 # Token usage
                 if hasattr(response, 'usage_metadata'):

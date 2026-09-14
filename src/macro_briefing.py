@@ -36,10 +36,9 @@ except Exception:
 
 from src.macro_data import load_macro, load_spy, compute_hf_metrics
 
-# NOTE: app.py's live Tab 8 still hard-codes "gemini-2.0-flash", which
-# Google's API now rejects with a 404 pointing at this model instead
-# (confirmed live during testing on 2026-09-14) — the deployed dashboard's
-# Gemini tab is likely broken until that's updated too.
+# "gemini-2.0-flash" (what app.py's Tab 8 used to hard-code) is no longer
+# served — Google's API 404s and points at this model instead (confirmed
+# live 2026-09-14). app.py's Tab 8 was updated to match in the same fix.
 GEMINI_MODEL = "gemini-3.6-flash"
 
 # Amazon Nova Pro — Amazon's own foundation model on Bedrock, generally
