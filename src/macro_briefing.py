@@ -68,10 +68,10 @@ def _get_gemini_key() -> Optional[str]:
     return os.environ.get("GEMINI_API_KEY")
 
 
-def _call_gemini(prompt: str, api_key: str) -> str:
+def _call_gemini(prompt: str, api_key: str, model: Optional[str] = None) -> str:
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model=GEMINI_MODEL,
+        model=model or GEMINI_MODEL,
         contents=prompt,
         config=genai_types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
     )
@@ -204,7 +204,8 @@ def _load_dashboard_state(d_start: Optional[str] = None, d_end: Optional[str] = 
 
 def generate_briefing(analysis_type: str, custom_question: str = "",
                        d_start: Optional[str] = None, d_end: Optional[str] = None,
-                       api_key: Optional[str] = None, provider: str = "gemini") -> dict:
+                       api_key: Optional[str] = None, provider: str = "gemini",
+                       model_id: Optional[str] = None) -> dict:
     """
     Run the full Tab-8 pipeline headlessly: load data, build context,
     build the prompt, call the chosen LLM provider, return the analysis.
@@ -212,6 +213,9 @@ def generate_briefing(analysis_type: str, custom_question: str = "",
     provider: "gemini" (default, matches the live dashboard's Tab 8 exactly)
               or "bedrock" (Amazon Bedrock via boto3 — AWS Builder mini
               challenge integration; uses the standard AWS credential chain).
+    model_id: optional override for the provider's default model — a Gemini
+              model name for provider="gemini", or a Bedrock model ID for
+              provider="bedrock" (must be enabled for the account/region).
 
     Returns {"text": str, ...} on success, {"error": str} on failure — never
     raises, so MCP tool callers get a clean structured result either way.
@@ -234,23 +238,24 @@ def generate_briefing(analysis_type: str, custom_question: str = "",
     if provider == "bedrock":
         if not _BOTO3_OK:
             return {"error": "boto3 package is not installed."}
-        model_id = os.environ.get("BEDROCK_MODEL_ID", BEDROCK_DEFAULT_MODEL)
+        resolved_model = model_id or os.environ.get("BEDROCK_MODEL_ID", BEDROCK_DEFAULT_MODEL)
         try:
-            text = _call_bedrock(prompt, model_id=model_id)
+            text = _call_bedrock(prompt, model_id=resolved_model)
         except Exception as e:
             return {"error": f"Bedrock error: {e}"}
-        model_used = model_id
+        model_used = resolved_model
     else:
         if not _GENAI_OK:
             return {"error": "google-genai package is not installed."}
         key = api_key or _get_gemini_key()
         if not key:
             return {"error": "No Gemini API key configured (set GEMINI_API_KEY)."}
+        resolved_model = model_id or GEMINI_MODEL
         try:
-            text = _call_gemini(prompt, key)
+            text = _call_gemini(prompt, key, model=resolved_model)
         except Exception as e:
             return {"error": f"Gemini API error: {e}"}
-        model_used = GEMINI_MODEL
+        model_used = resolved_model
 
     return {
         "text": text,

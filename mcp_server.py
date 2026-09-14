@@ -32,6 +32,7 @@ from mcp.server.mcpserver import MCPServer
 from src.macro_data import load_macro, load_spy, compute_hf_metrics
 from src.quant_signals import run_quant_scan, format_alert_text, DEFAULT_UNIVERSE
 from src.macro_briefing import generate_briefing, ANALYSIS_TYPES
+from src.macro_extras import summarize_monte_carlo, summarize_backtest, summarize_nvda_danger_zone
 
 mcp = MCPServer(
     "macropulse",
@@ -156,15 +157,60 @@ def get_risk_metrics(start: str = "", end: str = "") -> dict:
 
 @mcp.tool()
 def get_macro_briefing(analysis_type: str = "Full Macro Briefing", custom_question: str = "",
-                        provider: str = "gemini") -> dict:
+                        provider: str = "gemini", model_id: str = "") -> dict:
     """Get an AI-generated hedge-fund-style macro briefing grounded in the
     live dashboard data. analysis_type must be one of: 'Full Macro
     Briefing', 'Regime Deep-Dive', 'Risk Assessment', 'Investment Outlook',
     or 'Custom Question' (pass your question in custom_question).
     provider is 'gemini' (default, requires GEMINI_API_KEY) or 'bedrock'
-    (Amazon Bedrock — Amazon Nova Pro by default, requires AWS credentials
-    configured on the server via the standard AWS credential chain)."""
-    return generate_briefing(analysis_type=analysis_type, custom_question=custom_question, provider=provider)
+    (Amazon Bedrock, requires AWS credentials configured on the server via
+    the standard AWS credential chain). model_id optionally overrides the
+    default model for the chosen provider — e.g. 'anthropic.claude-3-5-sonnet-20241022-v2:0'
+    or 'meta.llama3-1-70b-instruct-v1:0' for provider='bedrock' (defaults to
+    Amazon Nova Pro), or a Gemini model name for provider='gemini' (defaults
+    to gemini-3.6-flash). Bedrock model IDs must be enabled for your AWS
+    account/region in the Bedrock console before use."""
+    return generate_briefing(analysis_type=analysis_type, custom_question=custom_question,
+                              provider=provider, model_id=model_id or None)
+
+
+@mcp.tool()
+def get_monte_carlo_risk(mu_pct: float = 8.0, vol_pct: float = 16.0,
+                          n_paths: int = 5000, horizon_months: int = 12) -> dict:
+    """Run a Monte Carlo simulation of forward returns given an assumed
+    annual expected return (mu_pct) and volatility (vol_pct), both in
+    percent. Returns expected/median return, VaR 95%, CVaR 95% (expected
+    shortfall), P10/P90, and probability of a positive / >10% outcome
+    over the given horizon. Informational only, not a forecast."""
+    return summarize_monte_carlo(mu_pct=mu_pct, vol_pct=vol_pct, n_paths=n_paths, horizon_months=horizon_months)
+
+
+@mcp.tool()
+def get_strategy_backtest(use_regime: bool = True, use_momentum: bool = True, use_trend: bool = True,
+                           threshold: float = 0.5, cost_bps: float = 5.0, allow_short: bool = False) -> dict:
+    """Run a walk-forward, no-lookahead backtest of an SPY/cash allocation
+    strategy gated by up to three signals (macro regime, 12-1 momentum,
+    10-month SMA trend) and compare it to buy-and-hold. threshold is the
+    fraction of active signals required to be long (0.34-1.0); cost_bps is
+    the round-trip transaction cost per unit of turnover. Returns each
+    side's annualized return, Sharpe, max drawdown, and Calmar ratio, plus
+    time-in-market and how often the position flipped. Informational only,
+    not trading advice."""
+    df = load_macro()
+    return summarize_backtest(df, compute_hf_metrics, use_regime=use_regime, use_momentum=use_momentum,
+                               use_trend=use_trend, threshold=threshold, cost_bps=cost_bps,
+                               allow_short=allow_short)
+
+
+@mcp.tool()
+def get_nvda_danger_zone() -> dict:
+    """Get NVIDIA's current 'danger zone' reading — a composite 0-1 index
+    blending RSI extension, ATR volatility, relative volume, VIX level, and
+    distance above its 50-day SMA, labeled Safe Zone / Caution / Danger
+    Zone. Also returns the underlying component readings and how AI-chip
+    peers (SOXX, AMD, TSM, AVGO, MU) have moved over the same window.
+    Informational only, not trading advice."""
+    return summarize_nvda_danger_zone()
 
 
 if __name__ == "__main__":
