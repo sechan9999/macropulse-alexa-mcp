@@ -33,6 +33,7 @@ from src.macro_data import load_macro, load_spy, compute_hf_metrics
 from src.quant_signals import run_quant_scan, format_alert_text, DEFAULT_UNIVERSE
 from src.macro_briefing import generate_briefing, ANALYSIS_TYPES
 from src.macro_extras import summarize_monte_carlo, summarize_backtest, summarize_nvda_danger_zone
+from src.firestore_service import get_watchlist, save_watchlist, add_ticker, remove_ticker
 
 mcp = MCPServer(
     "macropulse",
@@ -93,12 +94,20 @@ def get_quant_signal(ticker: str) -> dict:
 
 
 @mcp.tool()
-def get_watchlist_scan(tickers: str = "", top_n: int = 5) -> dict:
+def get_watchlist_scan(tickers: str = "", top_n: int = 5, user_id: str = "") -> dict:
     """Scan a watchlist and return the top buy and sell candidates by
     conviction score. Pass tickers as a comma-separated string
-    (e.g. 'AAPL,MSFT,NVDA'); leave empty to scan the default watchlist
-    (SPY, QQQ, major mega-caps). Informational only, not trading advice."""
-    universe = tuple(t.strip().upper() for t in tickers.split(",") if t.strip()) or DEFAULT_UNIVERSE
+    (e.g. 'AAPL,MSFT,NVDA'); if empty and user_id is given, scans that
+    user's saved watchlist (see get_my_watchlist/add_to_watchlist); if
+    both are empty, scans the default watchlist (SPY, QQQ, major
+    mega-caps). Informational only, not trading advice."""
+    explicit = tuple(t.strip().upper() for t in tickers.split(",") if t.strip())
+    if explicit:
+        universe = explicit
+    elif user_id:
+        universe = tuple(get_watchlist(user_id)) or DEFAULT_UNIVERSE
+    else:
+        universe = DEFAULT_UNIVERSE
     scan = run_quant_scan(universe, period="1y")
     if scan.empty:
         return {"error": "no_data", "universe": list(universe)}
@@ -120,6 +129,51 @@ def get_watchlist_scan(tickers: str = "", top_n: int = 5) -> dict:
         "sell_candidates": _rows(sells),
         "summary_text": format_alert_text(scan, top_n=top_n),
     }
+
+
+# ── Personalized watchlists ───────────────────────────────────────────────
+# user_id is a plain caller-supplied string, not a verified identity — see
+# src/firestore_service.py's module docstring for why (Alexa+ hasn't
+# published how it passes account identity to a self-hosted MCP server
+# yet). Ships trust-based; tighten once that's documented.
+
+@mcp.tool()
+def get_my_watchlist(user_id: str) -> dict:
+    """Get a user's saved watchlist (list of tickers). Returns an empty
+    list if they haven't saved one yet — that's not an error."""
+    if not user_id.strip():
+        return {"error": "user_id is required"}
+    return {"user_id": user_id, "tickers": get_watchlist(user_id)}
+
+
+@mcp.tool()
+def add_to_watchlist(user_id: str, ticker: str) -> dict:
+    """Add one ticker to a user's saved watchlist (no-op if it's already
+    there). Returns the resulting full list."""
+    if not user_id.strip():
+        return {"error": "user_id is required"}
+    if not ticker.strip():
+        return {"error": "ticker is required"}
+    try:
+        tickers = add_ticker(user_id, ticker)
+    except Exception as e:
+        return {"error": str(e)}
+    return {"user_id": user_id, "tickers": tickers}
+
+
+@mcp.tool()
+def remove_from_watchlist(user_id: str, ticker: str) -> dict:
+    """Remove one ticker from a user's saved watchlist (no-op if it isn't
+    there). Returns the resulting full list."""
+    if not user_id.strip():
+        return {"error": "user_id is required"}
+    if not ticker.strip():
+        return {"error": "ticker is required"}
+    try:
+        tickers = remove_ticker(user_id, ticker)
+    except Exception as e:
+        return {"error": str(e)}
+    return {"user_id": user_id, "tickers": tickers}
 
 
 @mcp.tool()
