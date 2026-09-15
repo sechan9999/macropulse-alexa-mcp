@@ -96,6 +96,28 @@ except Exception as _e:
     _BQ_OK = False
     _import_errors["bigquery"] = str(_e)
 
+# Personalized watchlists — same Firestore store the Alexa+ MCP server and
+# Fire TV app read/write, now surfaced in the dashboard itself.
+try:
+    from src.firestore_service import is_firestore_available, get_watchlist, save_watchlist
+    _FS_OK = is_firestore_available()
+except Exception as _e:
+    _FS_OK = False
+    def get_watchlist(user_id):  # graceful no-op fallback
+        return []
+    def save_watchlist(user_id, tickers):
+        raise RuntimeError("Firestore is not available")
+    _import_errors["firestore"] = str(_e)
+
+# Amazon Bedrock — alternate AI Analyst provider (AWS Builder mini-challenge).
+try:
+    from src.macro_briefing import _call_bedrock as call_bedrock, BEDROCK_DEFAULT_MODEL, _BOTO3_OK
+except Exception as _e:
+    call_bedrock = None
+    BEDROCK_DEFAULT_MODEL = "amazon.nova-pro-v1:0"
+    _BOTO3_OK = False
+    _import_errors["bedrock"] = str(_e)
+
 # ── Secrets ──────────────────────────────────────────────────────────
 def _get_fred_key():
     try:
@@ -1034,10 +1056,42 @@ with tab4:
 # ─── Tab 5: Screener ─────────────────────────────────────────────────
 with tab5:
     render_methodology("screener", st)
+
+    with st.expander("👤 My Watchlist — save/load tickers (shared with Alexa+ & Fire TV)"):
+        if not _FS_OK:
+            st.caption("Watchlist storage is unavailable in this environment.")
+        else:
+            wl_user = st.text_input("User ID", key="wl_user_id",
+                                    placeholder="e.g. your email or a nickname")
+            wl_c1, wl_c2 = st.columns(2)
+            with wl_c1:
+                if st.button("📂 Load my watchlist"):
+                    if wl_user.strip():
+                        loaded = get_watchlist(wl_user.strip())
+                        if loaded:
+                            st.session_state["screener_custom_tickers"] = ", ".join(loaded)
+                            st.success(f"Loaded {len(loaded)} tickers.")
+                        else:
+                            st.info("No saved watchlist for this user yet.")
+                    else:
+                        st.warning("Enter a user ID first.")
+            with wl_c2:
+                if st.button("💾 Save current tickers"):
+                    current = st.session_state.get("screener_custom_tickers", "")
+                    if not wl_user.strip():
+                        st.warning("Enter a user ID first.")
+                    elif not current.strip():
+                        st.warning("Type some tickers in the field below first.")
+                    else:
+                        saved = save_watchlist(wl_user.strip(),
+                                               [t.strip() for t in current.split(",") if t.strip()])
+                        st.success(f"Saved {len(saved)} tickers to your watchlist.")
+
     col_u, col_p, col_s = st.columns([2,1,1])
     with col_u:
         # fix #19: custom ticker input
         custom_raw = st.text_input("Custom tickers (comma-separated)",
+                                   key="screener_custom_tickers",
                                    placeholder="e.g. NVDA, META, TSLA")
         default_universe = QS_DEFAULT_UNIVERSE  # shared with the Quant Signals tab
         if custom_raw.strip():
@@ -1368,17 +1422,29 @@ def _get_gemini_key():
 
 with tab8:
     render_methodology("gemini", st)
-    st.markdown("### ✨ Gemini AI Macro Analyst")
-    st.caption("Powered by Google Gemini 3 Flash via Unified GenAI SDK")
+    st.markdown("### ✨ AI Macro Analyst")
+    st.caption("Google Gemini or Amazon Bedrock — same macro context, your choice of model")
 
-    gemini_key = _get_gemini_key()
+    provider = st.radio("Provider", ["Gemini", "Amazon Bedrock"], horizontal=True, key="briefing_provider")
 
-    # Key input if not set
-    if not gemini_key:
-        st.info("Enter your Gemini API key to activate AI analysis. Get a free key at https://aistudio.google.com/app/apikey")
-        gemini_key = st.text_input("Gemini API Key", type="password", placeholder="AIza...")
+    gemini_key = None
+    bedrock_model = BEDROCK_DEFAULT_MODEL
+    if provider == "Gemini":
+        gemini_key = _get_gemini_key()
+        # Key input if not set
+        if not gemini_key:
+            st.info("Enter your Gemini API key to activate AI analysis. Get a free key at https://aistudio.google.com/app/apikey")
+            gemini_key = st.text_input("Gemini API Key", type="password", placeholder="AIza...")
+        provider_ready = bool(gemini_key)
+    else:
+        if not _BOTO3_OK:
+            st.error("boto3 is not installed — Amazon Bedrock is unavailable in this environment.")
+        else:
+            st.caption("Uses AWS credentials from the server environment (IAM role / `aws configure` / env vars) — no key entry needed here.")
+            bedrock_model = st.text_input("Bedrock model ID", value=BEDROCK_DEFAULT_MODEL, key="bedrock_model_id")
+        provider_ready = _BOTO3_OK
 
-    if gemini_key:
+    if provider_ready:
         # Build context from live data
         latest_data = df.iloc[-1]
         prev_data   = df.iloc[-2] if len(df) > 1 else df.iloc[-1]
@@ -1472,56 +1538,68 @@ User Question: {custom_q}
 Answer as a senior macro analyst using the data above."""
         }
 
-        run_analysis = st.button("🚀 Generate Gemini Analysis", type="primary", key="run_gemini")
+        run_analysis = st.button(f"🚀 Generate {provider} Analysis", type="primary", key="run_briefing")
 
         if run_analysis and (analysis_type != "Custom Question" or custom_q.strip()):
             try:
-                with st.spinner("Gemini is analyzing macro conditions..."):
-                    client = genai.Client(api_key=gemini_key)
-                    response = client.models.generate_content(
-                        model="gemini-3.6-flash",
-                        contents=prompts[analysis_type],
-                        config=genai_types.GenerateContentConfig(
-                            system_instruction=(
-                                "You are a senior quantitative macro analyst at a leading hedge fund. "
-                                "Your analysis is precise, data-driven, and actionable. "
-                                "You interpret financial data with institutional rigor."
+                with st.spinner(f"{provider} is analyzing macro conditions..."):
+                    if provider == "Gemini":
+                        client = genai.Client(api_key=gemini_key)
+                        response = client.models.generate_content(
+                            model="gemini-3.6-flash",
+                            contents=prompts[analysis_type],
+                            config=genai_types.GenerateContentConfig(
+                                system_instruction=(
+                                    "You are a senior quantitative macro analyst at a leading hedge fund. "
+                                    "Your analysis is precise, data-driven, and actionable. "
+                                    "You interpret financial data with institutional rigor."
+                                )
                             )
                         )
-                    )
+                        analysis_text = response.text
+                        model_label = "gemini-3.6-flash"
+                        usage_caption = None
+                        if hasattr(response, 'usage_metadata'):
+                            usage_caption = (f"Tokens — Input: {response.usage_metadata.prompt_token_count} | "
+                                             f"Output: {response.usage_metadata.candidates_token_count}")
+                    else:
+                        analysis_text = call_bedrock(prompts[analysis_type], model_id=bedrock_model)
+                        model_label = bedrock_model
+                        usage_caption = None
 
                 st.markdown("---")
-                st.markdown("#### 🧠 Gemini Analysis")
-                
+                st.markdown("#### 🧠 Analysis")
+
                 # Enhanced readability container for AI response
                 st.markdown(f"""
                 <div class="analysis-card">
-                    {response.text}
+                    {analysis_text}
                 </div>
                 """, unsafe_allow_html=True)
-                
-                st.markdown("---")
-                st.caption(f"Model: gemini-3.6-flash | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} | Data through {df.index[-1].strftime('%B %Y')}")
 
-                # Token usage
-                if hasattr(response, 'usage_metadata'):
-                    st.caption(f"Tokens — Input: {response.usage_metadata.prompt_token_count} | Output: {response.usage_metadata.candidates_token_count}")
+                st.markdown("---")
+                st.caption(f"Provider: {provider} | Model: {model_label} | "
+                          f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')} | "
+                          f"Data through {df.index[-1].strftime('%B %Y')}")
+
+                if usage_caption:
+                    st.caption(usage_caption)
 
             except Exception as e:
-                st.error(f"Gemini API error: {e}")
-                if "API_KEY" in str(e).upper() or "invalid" in str(e).lower():
+                st.error(f"{provider} error: {e}")
+                if provider == "Gemini" and ("API_KEY" in str(e).upper() or "invalid" in str(e).lower()):
                     st.info("Check your API key. Get one free at https://aistudio.google.com/app/apikey")
         elif run_analysis and analysis_type == "Custom Question" and not custom_q.strip():
             st.warning("Please enter your question first.")
-    else:
+    elif provider == "Gemini":
         st.warning("Add a Gemini API key above to unlock AI-powered macro analysis.")
 
-    # Show what data is being fed to Gemini
-    with st.expander("📄 View Macro Context Sent to Gemini"):
-        if gemini_key:
+    # Show what data is being fed to the model
+    with st.expander("📄 View Macro Context Sent to the Model"):
+        if provider_ready:
             st.code(macro_context, language="markdown")
         else:
-            st.info("Enter API key first to preview context.")
+            st.info("Select a ready provider above to preview context.")
 
 # ══════════════════════════════════════════
 # TAB 9: NVDA DANGER ZONE & MICRO FOOTPRINT
