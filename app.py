@@ -1161,15 +1161,23 @@ with tab6:
     )
 
     BZS_DEFAULT = ("NVDA","MSFT","TSM","ASML","AMZN","GOOGL","AVGO","LLY","V","COST")
-    cA, cB = st.columns([3, 1])
+    cA, cB, cC = st.columns([3, 1, 1])
     with cA:
         bzs_input = st.text_input("Tickers (comma-separated)",
                                    ", ".join(BZS_DEFAULT), key="bzs_tickers")
     with cB:
         bzs_years = st.selectbox("Lookback", [2, 3, 5, 7], index=1, key="bzs_years")
+    with cC:
+        st.markdown("<div style='height:1.6rem'></div>", unsafe_allow_html=True)
+        # Gated behind a button (like Screener/Quant Signals) — this scan used
+        # to run unconditionally on every script rerun, including the very
+        # first page load, which slowed down opening the app.
+        bzs_run = st.button("🔎 Scan", type="primary", key="bzs_run")
     bzs_tickers = tuple(t.strip().upper() for t in bzs_input.split(",") if t.strip())[:30]
 
-    if bzs_tickers:
+    if not bzs_run:
+        st.info("Click **Scan** to run the Buy Zone Scanner (a live yfinance fetch across up to 30 tickers).")
+    elif bzs_tickers:
         bzs_df = scan_buy_zones(bzs_tickers, years=int(bzs_years))
         ok = bzs_df[~bzs_df.get("Price", pd.Series(dtype=float)).isna()] if "Price" in bzs_df else pd.DataFrame()
         bad = bzs_df[bzs_df.get("Price", pd.Series(dtype=float)).isna()] if "Price" in bzs_df else bzs_df
@@ -1751,11 +1759,21 @@ with tab9:
                                    ["Daily (recommended)", "Weekly pivot"], index=0,
                                    key="nvda_detail")
 
-    with st.spinner("🔥 Computing NVDA Danger Index…"):
-        df_nv, df_ctx_nv = fetch_nvda_full(nvda_days)
+    # Gated behind a button (like Screener/Quant Signals) — this tab's live
+    # NVDA+SOX+VIX fetch used to run unconditionally on every script rerun,
+    # including the very first page load, which slowed down opening the app.
+    load_nvda = st.button("🔥 Load NVDA Danger Zone (live fetch)", type="primary", key="nvda_load")
+
+    df_nv, df_ctx_nv = None, {}
+    if load_nvda:
+        with st.spinner("🔥 Computing NVDA Danger Index…"):
+            df_nv, df_ctx_nv = fetch_nvda_full(nvda_days)
 
     if df_nv is None or (isinstance(df_nv, dict) and len(df_nv) == 0):
-        st.error("Could not fetch NVDA data. Check network or try again.")
+        if load_nvda:
+            st.error("Could not fetch NVDA data. Check network or try again.")
+        else:
+            st.info("Click **Load NVDA Danger Zone** above to fetch live NVDA/SOX/VIX data.")
     else:
         last_nv = df_nv.iloc[-1]
         prev_nv = df_nv.iloc[-2] if len(df_nv) > 1 else df_nv.iloc[-1]
