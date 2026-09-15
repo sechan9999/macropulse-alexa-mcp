@@ -1133,7 +1133,10 @@ with tab5:
         st.dataframe(styled, use_container_width=True, hide_index=True)
 
         # fix #20: export button
-        csv = sc_df.to_csv(index=False).encode()
+        # utf-8-sig (BOM) so Excel — the default CSV viewer on Windows —
+        # detects UTF-8 instead of misreading non-ASCII text as the system
+        # codepage (garbles Korean/other non-Latin text otherwise).
+        csv = sc_df.to_csv(index=False).encode("utf-8-sig")
         st.download_button("⬇️ Export CSV", csv, "screener_results.csv", "text/csv")
 
         # Bar chart using raw floats (fix #2)
@@ -1210,8 +1213,10 @@ with tab6:
 
             st.download_button(
                 "📥 Export buy-zone scan to CSV",
+                # utf-8-sig (BOM) so Excel detects UTF-8 instead of garbling
+                # non-ASCII text via the system codepage.
                 ok.drop(columns=[c for c in ("_lo","_hi","_err") if c in ok.columns])
-                  .to_csv(index=False).encode("utf-8"),
+                  .to_csv(index=False).encode("utf-8-sig"),
                 file_name="buy_zone_scanner.csv",
                 mime="text/csv",
                 key="bzs_csv",
@@ -2375,7 +2380,9 @@ with tab11:
             styled = show.style.map(_color_signal, subset=["Signal"])
             st.dataframe(styled, use_container_width=True, hide_index=True)
 
-            csv = ok.to_csv(index=False).encode()
+            # utf-8-sig (BOM) so Excel detects UTF-8 instead of garbling the
+            # Korean/non-ASCII text in the Reasons column.
+            csv = ok.to_csv(index=False).encode("utf-8-sig")
             st.download_button("⬇️ Export CSV", csv, "quant_signals.csv", "text/csv", key="qs_csv")
 
             if not bad.empty:
