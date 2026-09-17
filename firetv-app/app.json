@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "plugins": [
+      [
+        "@react-native-tvos/config-tv",
+        {
+          "isTV": true
+        }
+      ]
+    ],
+    "name": "MacroPulseTV",
+    "slug": "MacroPulseTV",
+    "version": "1.0.0"
+  }
+}
