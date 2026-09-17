@@ -753,10 +753,11 @@ st.markdown("---")
 # ══════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════
-tab1,tab2,tab3,tab4,tab5,tab6,tab7,tab8,tab9,tab10,tab11 = st.tabs([
+tab1,tab2,tab3,tab4,tab5,tab6,tab7,tab8,tab9,tab10,tab11,tab12,tab13 = st.tabs([
     "📈 Performance","🌍 Macro & Rates","🔍 Regime","🤖 Expected Returns",
     "📊 Screener","📉 Technical","🎲 Risk Sim","✨ Gemini AI Analyst",
-    "🔥 NVDA Danger Zone","📊 Strategy Backtest","🎯 Quant Signals"])
+    "🔥 NVDA Danger Zone","📊 Strategy Backtest","🎯 Quant Signals","🎙️ Alexa+ Copilot",
+    "🏦 Multi-Asset Sync & FOMC Shock"])
 
 # ─── Tab 1: Performance ──────────────────────────────────────────────
 with tab1:
@@ -1707,6 +1708,21 @@ with tab9:
             &nbsp;|&nbsp; as of <b>{df_nv.index[-1].strftime('%b %d, %Y')}</b>
         </div>""", unsafe_allow_html=True)
 
+        if danger_now >= 0.33:
+            try:
+                from src.ambient_audio import get_chime_base64_data_uri
+                dz_chime = get_chime_base64_data_uri("danger_zone")
+                st.markdown(f"""
+                <div style="display:flex; align-items:center; gap:12px; margin: 4px 0 10px 0;">
+                  <span style="color:#f87171; font-weight:600; font-size:0.85rem;">🚨 Ambient Audio Caution Pulse:</span>
+                  <audio controls style="height:28px;">
+                    <source src="{dz_chime}" type="audio/wav">
+                  </audio>
+                </div>
+                """, unsafe_allow_html=True)
+            except Exception:
+                pass
+
         st.markdown("---")
 
         # ════════════════════════════════════════════════
@@ -2300,6 +2316,21 @@ with tab11:
                     <ul>{"".join(f"<li>{r}</li>" for r in str(row['Reasons']).split(" · "))}</ul>
                     </div>""", unsafe_allow_html=True)
 
+                if "BREAKOUT" in str(row['Vol Breakout']).upper() or "SQUEEZE" in str(row['Reasons']).upper():
+                    try:
+                        from src.ambient_audio import get_chime_base64_data_uri
+                        chime_uri = get_chime_base64_data_uri("bollinger_breakout")
+                        st.markdown(f"""
+                        <div style="display:flex; align-items:center; gap:12px; margin: 4px 0 12px 0;">
+                          <span style="color:#facc15; font-weight:600; font-size:0.85rem;">🔔 Ambient Bollinger Squeeze Audio Cue:</span>
+                          <audio controls style="height:28px;">
+                            <source src="{chime_uri}" type="audio/wav">
+                          </audio>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    except Exception:
+                        pass
+
                 df_t2, _ = fetch_stock(pick, str(date.today().replace(year=date.today().year-1)), str(date.today()))
                 if df_t2 is not None and not df_t2.empty:
                     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.7,0.3], vertical_spacing=0.03)
@@ -2339,3 +2370,429 @@ An **Extreme** volatility regime (today's realized vol in the top 15% of its own
 * Volatility regime and breakout detection need ~1 year of history; short lookbacks degrade quality.
 * **Not investment advice, and this tool does not place orders.** It only proposes a direction and shows its reasoning — you decide, size, and execute.
             """)
+
+# ─── Tab 12: Alexa+ Copilot (Model Context Protocol & Voice Simulator) ──
+with tab12:
+    render_methodology("alexa", st)
+
+    st.markdown("""
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+      <span style="font-size:2.4rem;">🎙️</span>
+      <div>
+        <h2 style="margin:0;background:linear-gradient(135deg,#38bdf8,#818cf8,#c084fc);
+          -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+          font-size:1.8rem;font-weight:800;">Alexa+ Institutional Macro Copilot</h2>
+        <p style="margin:0;color:#94a3b8;font-size:.85rem;">
+          Model Context Protocol (Streamable HTTP & SSE) · Amazon Agent Skills · Voice & Multimodal Execution
+        </p>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Protocol & Server Status Bar ──
+    st.markdown("""
+    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.2);
+                border-radius: 12px; padding: 14px 20px; margin-bottom: 20px; display: flex;
+                flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px;">
+      <div style="display:flex; align-items:center; gap: 8px;">
+        <span style="color:#34d399; font-size:1.1rem;">●</span>
+        <b style="color:#f8fafc; font-size:0.9rem;">MCP Transport:</b>
+        <span style="color:#38bdf8; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">Streamable HTTP / SSE (2025-11-25)</span>
+      </div>
+      <div style="display:flex; align-items:center; gap: 8px;">
+        <b style="color:#f8fafc; font-size:0.9rem;">Skill Manifest:</b>
+        <span style="color:#a78bfa; font-family:'JetBrains Mono',monospace; font-size:0.85rem;">macropulse-alexa v1.0</span>
+      </div>
+      <div style="display:flex; align-items:center; gap: 8px;">
+        <b style="color:#f8fafc; font-size:0.9rem;">Tools Registered:</b>
+        <span style="background:rgba(56,189,248,0.15); color:#38bdf8; padding:2px 8px; border-radius:4px; font-weight:600; font-size:0.8rem;">7 Active</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Lazy import of Agent Skill orchestrator
+    try:
+        from src.alexa_agent_skill import AlexaMacroSkill
+        _SKILL_OK = True
+    except Exception as e:
+        _SKILL_OK = False
+        st.error(f"Failed to load Alexa Agent Skill: {e}")
+
+    # ── Interactive Voice / Prompt Dispatcher ──
+    st.markdown("#### 🗣️ Spoken Voice Prompt Simulation")
+    st.caption("Click a preset voice invocation or type a custom command as if speaking to Alexa+ on your Echo or Fire TV:")
+
+    col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns(5)
+    preset_prompt = None
+
+    with col_p1:
+        if st.button("🟢 'Market Regime'", use_container_width=True):
+            preset_prompt = "Alexa, ask MacroPulse for today's market regime"
+    with col_p2:
+        if st.button("📺 'Show NVDA on TV'", use_container_width=True):
+            preset_prompt = "Alexa, show the NVDA Danger Zone on the TV"
+    with col_p3:
+        if st.button("⚡ 'FOMC Shock Test'", use_container_width=True):
+            preset_prompt = "Alexa, run an FOMC rate shock test on my portfolio"
+    with col_p4:
+        if st.button("🎲 '99% VaR Sim'", use_container_width=True):
+            preset_prompt = "Alexa, run a 99% risk simulation on SPY over the next 30 days"
+    with col_p5:
+        if st.button("⚡ 'Vol Breakout'", use_container_width=True):
+            preset_prompt = "Alexa, scan volatility squeeze breakouts on SPY"
+
+    # Input prompt text
+    default_text = preset_prompt if preset_prompt else "Alexa, what is today's market regime?"
+    user_query = st.text_input("Spoken Voice Input:", value=default_text, key="alexa_prompt_input")
+
+    col_btn, col_empty = st.columns([1, 4])
+    with col_btn:
+        run_query = st.button("🎙️ Dispatch to Alexa+", type="primary", use_container_width=True)
+
+    if (run_query or preset_prompt) and _SKILL_OK:
+        with st.spinner("⚡ Alexa+ querying MacroPulse MCP tools over Streamable HTTP..."):
+            res = AlexaMacroSkill.execute(user_query)
+
+        # ── 1. Spoken Audio Voice Response Box ──
+        spoken = res.get("spoken_response", "")
+        escaped_spoken = spoken.replace('"', '\\"').replace("'", "\\'").replace("\n", " ")
+
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.95));
+                    border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; padding: 22px;
+                    margin: 18px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-size:1.4rem;">🔊</span>
+              <b style="color:#38bdf8; font-size:1.1rem; letter-spacing:0.02em;">Alexa+ Spoken Briefing</b>
+            </div>
+            <span style="background:rgba(52,211,153,0.15); color:#34d399; font-size:0.75rem; padding:4px 10px; border-radius:12px; font-family:'JetBrains Mono',monospace;">
+              {res['latency_ms']} ms · Streamable HTTP
+            </span>
+          </div>
+          <p style="font-size:1.12rem; line-height:1.65; color:#f1f5f9; margin-bottom:14px; font-weight:400;">
+            "{spoken}"
+          </p>
+          <button onclick="window.speechSynthesis.cancel(); let u = new SpeechSynthesisUtterance('{escaped_spoken}'); u.rate = 1.05; window.speechSynthesis.speak(u);"
+                  style="background: #0284c7; color: #ffffff; border: none; padding: 8px 18px; border-radius: 8px;
+                         font-weight: 600; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            ▶️ Play Alexa Voice
+          </button>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── 2. Multimodal Display Card (Echo Show / Fire TV Screen) ──
+        card = res.get("display_card", {})
+        if card:
+            sentiment_colors = {
+                "bullish": ("#0d3320", "#34d399"),
+                "bearish": ("#3b0e0e", "#f87171"),
+                "caution": ("#332e00", "#facc15"),
+                "neutral": ("#1e293b", "#38bdf8")
+            }
+            bg_col, border_col = sentiment_colors.get(card.get("sentiment", "neutral"), ("#1e293b", "#38bdf8"))
+
+            st.markdown(f"""
+            <div style="background:{bg_col}; border: 2px solid {border_col}; border-radius: 14px; padding: 20px; margin-bottom: 20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <h3 style="margin:0; color:#ffffff; font-size:1.3rem;">📺 {card.get('title')}</h3>
+                <span style="color:{border_col}; font-weight:600; font-size:0.8rem; text-transform:uppercase;">Echo Show / Fire TV Multimodal Card</span>
+              </div>
+              <p style="margin:0 0 16px 0; color:#94a3b8; font-size:0.9rem;">{card.get('subtitle')}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            badges = card.get("badges", [])
+            if badges:
+                b_cols = st.columns(len(badges))
+                for idx, badge in enumerate(badges):
+                    b_cols[idx].metric(badge["label"], badge["value"])
+
+        # ── 3. APL Fire TV Inspector ──
+        if "apl_document" in res:
+            with st.expander("📺 Alexa Presentation Language (APL 2024.1) Fire TV Layout Directive", expanded=False):
+                st.caption("Standard APL document sent to Fire TV Stick, Fire TV Cube, and Echo Show devices:")
+                st.json(res["apl_document"])
+
+        # ── 4. Developer MCP Telemetry & JSON-RPC Trace ──
+        with st.expander("🛠️ Developer MCP Telemetry & Streamable HTTP Payload", expanded=False):
+            t_col1, t_col2, t_col3 = st.columns(3)
+            t_col1.metric("Tool Dispatched", res["tool_selected"])
+            t_col2.metric("Transport Protocol", "Streamable HTTP (SSE)")
+            t_col3.metric("Execution Latency", f"{res['latency_ms']} ms")
+
+            st.markdown("**Tool Arguments Dispatched:**")
+            st.code(json.dumps(res["tool_args"], indent=2), language="json")
+
+            st.markdown("**Raw Structured MCP JSON Payload:**")
+            st.json(res["raw_payload"])
+
+    # ── Ambient Audio Chimes Control Station ──
+    st.markdown("---")
+    st.markdown("#### 🔔 Personalized Ambient Audio Chimes (Fire TV & Web)")
+    st.caption("Subtle procedural harmonic audio cues emitted when high-conviction market events trigger:")
+
+    try:
+        from src.ambient_audio import get_chime_base64_data_uri
+        _AUDIO_OK = True
+    except Exception:
+        _AUDIO_OK = False
+
+    if _AUDIO_OK:
+        a_col1, a_col2, a_col3, a_col4 = st.columns(4)
+        with a_col1:
+            st.markdown("**Bollinger Squeeze Breakout**")
+            st.caption("Ascending C5-G5 bright marimba chime")
+            chime_b64 = get_chime_base64_data_uri("bollinger_breakout")
+            st.audio(chime_b64, format="audio/wav")
+
+        with a_col2:
+            st.markdown("**Credit Spread Divergence**")
+            st.caption("Low C3-Eb3 warm resonance gong")
+            chime_b64 = get_chime_base64_data_uri("credit_divergence")
+            st.audio(chime_b64, format="audio/wav")
+
+        with a_col3:
+            st.markdown("**NVDA Danger Zone Alert**")
+            st.caption("F#4-C5 pulsed caution chime")
+            chime_b64 = get_chime_base64_data_uri("danger_zone")
+            st.audio(chime_b64, format="audio/wav")
+
+        with a_col4:
+            st.markdown("**FOMC Rate Shock Bell**")
+            st.caption("Resonant A3-C#5 dual-tone bell")
+            chime_b64 = get_chime_base64_data_uri("fomc_shock")
+            st.audio(chime_b64, format="audio/wav")
+
+    # ── Client Connection Instructions ──
+    with st.expander("🔌 How to Connect an External MCP Client (Claude, Cursor, Alexa+ Gateway)"):
+        st.markdown("""
+To run the MacroPulse MCP server standalone on port 8000 and connect external clients:
+
+```bash
+# Launch the Streamable HTTP & SSE MCP server
+python run_alexa_mcp.py
+```
+
+**Streamable HTTP Endpoint:** `http://localhost:8000/mcp`  
+**SSE Endpoint:** `http://localhost:8000/sse`  
+**Alexa Skills Kit Webhook:** `http://localhost:8000/alexa/skill`  
+**Health Check:** `http://localhost:8000/health`
+
+**Claude Desktop Configuration (`claude_desktop_config.json`):**
+```json
+{
+  "mcpServers": {
+    "macropulse": {
+      "command": "python",
+      "args": ["-m", "src.alexa_mcp_server"]
+    }
+  }
+}
+```
+        """)
+
+
+# ─── Tab 13: Multi-Asset Sync & FOMC Shock Desk ───────────────────────
+with tab13:
+    render_methodology("portfolio_fomc", st)
+
+    try:
+        from src.brokerage_sync import BrokeragePortfolio, PRESET_PORTFOLIOS, ASSET_CLASSES
+        from src.ambient_audio import get_chime_base64_data_uri
+        _PORT_OK = True
+    except Exception as e:
+        _PORT_OK = False
+        st.error(f"Failed to load Brokerage Sync engine: {e}")
+
+    if _PORT_OK:
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+          <span style="font-size:2.4rem;">🏦</span>
+          <div>
+            <h2 style="margin:0;background:linear-gradient(135deg,#38bdf8,#818cf8,#34d399);
+              -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+              font-size:1.8rem;font-weight:800;">Multi-Asset Portfolio Sync & FOMC Shock Desk</h2>
+            <p style="margin:0;color:#94a3b8;font-size:.85rem;">
+              Read-Only Brokerage Connectors · Cross-Asset VaR (Equities, Bonds, Gold, Crypto) · Real-Time FOMC Rate Decision Shocks
+            </p>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ── Mode & Portfolio Controls ──
+        c_p1, c_p2, c_p3 = st.columns([2, 1, 1])
+        with c_p1:
+            portfolio_choice = st.selectbox(
+                "Connected Brokerage Portfolio:",
+                [
+                    "Preset: Macro Balanced (60/40 Modern)",
+                    "Preset: Tech & Semiconductor Alpha",
+                    "Preset: Institutional Risk Parity",
+                    "Preset: All-Weather Cross-Asset",
+                    "Alpaca Read-Only API (Demo Link)",
+                    "Interactive Brokers Flex (Demo Link)"
+                ],
+                index=0
+            )
+        with c_p2:
+            port_val = st.number_input(
+                "Portfolio Capital ($ USD):",
+                min_value=50000,
+                max_value=50000000,
+                value=1000000,
+                step=50000,
+                format="%d"
+            )
+        with c_p3:
+            tv_mode = st.toggle("📺 TV Big Screen Mode", value=False, help="Switches to high-contrast 10-foot UI with large typography for Fire TV")
+
+        # Instantiate portfolio
+        if "Alpaca" in portfolio_choice:
+            sample_alpaca = [
+                {"symbol": "SPY", "market_value": str(port_val * 0.35)},
+                {"symbol": "QQQ", "market_value": str(port_val * 0.25)},
+                {"symbol": "TLT", "market_value": str(port_val * 0.20)},
+                {"symbol": "GLD", "market_value": str(port_val * 0.10)},
+                {"symbol": "BTC-USD", "market_value": str(port_val * 0.10)},
+            ]
+            port = BrokeragePortfolio.from_alpaca_json(sample_alpaca)
+        elif "Interactive Brokers" in portfolio_choice:
+            sample_ibkr = [
+                {"contractDesc": "NVDA", "mktVal": str(port_val * 0.30)},
+                {"contractDesc": "MSFT", "mktVal": str(port_val * 0.25)},
+                {"contractDesc": "TLT", "mktVal": str(port_val * 0.25)},
+                {"contractDesc": "GLD", "mktVal": str(port_val * 0.10)},
+                {"contractDesc": "USO", "mktVal": str(port_val * 0.10)},
+            ]
+            port = BrokeragePortfolio.from_ibkr_json(sample_ibkr)
+        else:
+            preset_key = portfolio_choice.replace("Preset: ", "")
+            port = BrokeragePortfolio.from_preset(preset_key, float(port_val))
+
+        # Compute cross-asset risk
+        var_metrics = port.compute_cross_asset_var(confidence=95, horizon_days=30)
+        alloc = port.get_allocation_by_asset_class()
+
+        # ── KPI Metrics Row ──
+        if tv_mode:
+            # 10-foot Big Screen View
+            st.markdown(f"""
+            <div style="background:#020617; border: 3px solid #38bdf8; border-radius: 16px; padding: 26px; margin: 18px 0;
+                        box-shadow: 0 0 35px rgba(56, 189, 248, 0.35);">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:#94a3b8; font-size:1.4rem; font-weight:600; text-transform:uppercase;">📺 Big Screen Portfolio Value</span>
+                <span style="background:rgba(52,211,153,0.2); color:#34d399; font-size:1.1rem; padding:4px 14px; border-radius:14px; font-weight:700;">LIVE SYNC</span>
+              </div>
+              <h1 style="font-size:3.6rem; color:#ffffff; margin: 12px 0; font-weight:900;">${var_metrics['portfolio_value_usd']:,.0f}</h1>
+              <div style="display:flex; gap:32px; margin-top:16px; flex-wrap:wrap;">
+                <div><span style="color:#94a3b8; font-size:1.1rem;">30d VaR 95%:</span> <b style="color:#f87171; font-size:1.6rem;">{var_metrics['var_pct']:+.1f}% (${var_metrics['var_dollar']:+,.0f})</b></div>
+                <div><span style="color:#94a3b8; font-size:1.1rem;">Expected Shortfall (CVaR):</span> <b style="color:#f87171; font-size:1.6rem;">{var_metrics['cvar_pct']:+.1f}%</b></div>
+                <div><span style="color:#94a3b8; font-size:1.1rem;">Annualized Volatility:</span> <b style="color:#38bdf8; font-size:1.6rem;">{var_metrics['annualized_volatility_pct']:.1f}%</b></div>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            k1, k2, k3, k4, k5 = st.columns(5)
+            k1.metric("Portfolio Capital", f"${var_metrics['portfolio_value_usd']:,.0f}")
+            k2.metric("Annualized Volatility", f"{var_metrics['annualized_volatility_pct']:.1f}%")
+            k3.metric("30-Day VaR (95%)", f"{var_metrics['var_pct']:+.1f}%", f"${var_metrics['var_dollar']:+,.0f}")
+            k4.metric("Expected Shortfall (CVaR)", f"{var_metrics['cvar_pct']:+.1f}%", f"${var_metrics['cvar_dollar']:+,.0f}")
+            k5.metric("Connected Source", port.source.split(":")[0])
+
+        # ── Cross-Asset Visualizations ──
+        c_ch1, c_ch2 = st.columns(2)
+        with c_ch1:
+            fig_alloc = go.Figure(data=[go.Pie(
+                labels=list(alloc.keys()),
+                values=[round(v * 100, 1) for v in alloc.values()],
+                hole=0.45,
+                marker=dict(colors=["#38bdf8", "#818cf8", "#facc15", "#34d399"]),
+                textinfo="label+percent",
+                hoverinfo="label+value"
+            )])
+            fig_alloc.update_layout(title="Asset Class Distribution", height=320, **PT)
+            st.plotly_chart(fig_alloc, use_container_width=True)
+
+        with c_ch2:
+            r_contrib = var_metrics["risk_contributions"]
+            fig_risk = go.Figure(data=[go.Bar(
+                x=list(r_contrib.keys()),
+                y=[round(v * 100, 1) for v in r_contrib.values()],
+                marker_color="#818cf8",
+                text=[f"{v*100:.1f}%" for v in r_contrib.values()],
+                textposition="auto"
+            )])
+            fig_risk.update_layout(title="Marginal Risk Contribution by Asset (% Component VaR)", height=320, **PT)
+            update_axes(fig_risk, "Asset", "% Vol Contribution")
+            st.plotly_chart(fig_risk, use_container_width=True)
+
+        # ── FOMC Rate Decision Shock Testing ──
+        st.markdown("---")
+        st.markdown("### 🏛️ Real-Time FOMC Rate Decision Shock Simulator")
+        st.caption("Stress test your multi-asset portfolio against unexpected Federal Reserve rate changes and curve shocks:")
+
+        sc_col1, sc_col2, sc_col3, sc_col4 = st.columns(4)
+        active_scenario = "hawkish_50bps"
+
+        with sc_col1:
+            if st.button("⚡ Hawkish (+50 bps Hike)", use_container_width=True, type="primary"):
+                st.session_state["fomc_scen"] = "hawkish_50bps"
+        with sc_col2:
+            if st.button("🕊️ Dovish (-50 bps Cut)", use_container_width=True):
+                st.session_state["fomc_scen"] = "dovish_50bps"
+        with sc_col3:
+            if st.button("⚠️ Stagflation Inversion", use_container_width=True):
+                st.session_state["fomc_scen"] = "stagflation_inversion"
+        with sc_col4:
+            if st.button("🌊 Liquidity Flash Crunch", use_container_width=True):
+                st.session_state["fomc_scen"] = "liquidity_cascade"
+
+        current_scen = st.session_state.get("fomc_scen", "hawkish_50bps")
+        shock_result = port.simulate_fomc_shock(current_scen)
+
+        # Shock Results Display
+        pnl_color = "#f87171" if shock_result["total_pnl_dollar"] < 0 else "#34d399"
+        pnl_bg = "#3b0e0e" if shock_result["total_pnl_dollar"] < 0 else "#0d3320"
+
+        st.markdown(f"""
+        <div style="background:{pnl_bg}; border: 2px solid {pnl_color}; border-radius: 14px; padding: 22px; margin: 18px 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <h3 style="margin:0; color:#ffffff; font-size:1.4rem;">🏛️ {shock_result['scenario_title']}</h3>
+            <span style="background:rgba(255,255,255,0.15); color:#ffffff; padding:4px 12px; border-radius:8px; font-weight:700; font-size:0.9rem;">
+              SIMULATED FOMC SHOCK
+            </span>
+          </div>
+          <p style="color:#e2e8f0; font-size:1.05rem; margin-bottom:14px;">{shock_result['alexa_spoken_response']}</p>
+          <div style="display:flex; gap:36px; flex-wrap:wrap;">
+            <div><span style="color:#94a3b8; font-size:0.9rem;">Stressed Portfolio Value:</span><br/><b style="font-size:1.8rem; color:#ffffff;">${shock_result['stressed_portfolio_value']:,.0f}</b></div>
+            <div><span style="color:#94a3b8; font-size:0.9rem;">Total PnL ($):</span><br/><b style="font-size:1.8rem; color:{pnl_color};">${shock_result['total_pnl_dollar']:+,.0f}</b></div>
+            <div><span style="color:#94a3b8; font-size:0.9rem;">Total Return (%):</span><br/><b style="font-size:1.8rem; color:{pnl_color};">{shock_result['total_pnl_pct']:+.2f}%</b></div>
+          </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Audio cue button
+        col_snd, col_spc = st.columns([1, 4])
+        with col_snd:
+            chime_uri = get_chime_base64_data_uri("fomc_shock")
+            st.markdown(f"""
+            <audio controls style="height:36px; margin-top:6px;">
+              <source src="{chime_uri}" type="audio/wav">
+            </audio>
+            """, unsafe_allow_html=True)
+
+        # Breakdown Table
+        breakdown_rows = []
+        for ticker, info in shock_result["breakdown_by_ticker"].items():
+            breakdown_rows.append({
+                "Ticker": ticker,
+                "Asset Class": info["asset_class"],
+                "Weight (%)": f"{info['weight_pct']:.1f}%",
+                "Shock Impact (%)": f"{info['shock_return_pct']:+.2f}%",
+                "PnL Dollar ($)": f"${info['pnl_dollar']:+,.0f}"
+            })
+        df_fomc = pd.DataFrame(breakdown_rows)
+        st.dataframe(df_fomc, use_container_width=True, hide_index=True)
+
+

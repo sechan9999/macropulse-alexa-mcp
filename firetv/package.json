@@ -1,0 +1,20 @@
+{
+  "name": "macropulse-firetv",
+  "version": "2.0.0",
+  "description": "MacroPulse Fire TV Companion & Big-Screen Desk",
+  "scripts": {
+    "build:pwa": "echo 'Packaging MacroPulse Fire TV Web App...'",
+    "deploy:firetv": "adb install -r dist/macropulse-firetv.apk"
+  },
+  "dependencies": {},
+  "keywords": [
+    "firetv",
+    "amazon-fire-os",
+    "macroeconomics",
+    "fomc",
+    "quant",
+    "alexa"
+  ],
+  "author": "MacroPulse Research",
+  "license": "Apache-2.0"
+}

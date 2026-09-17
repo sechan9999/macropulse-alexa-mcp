@@ -1,0 +1,68 @@
+{
+  "manifest": {
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "MacroPulse Institutional Copilot",
+          "summary": "Institutional macroeconomic intelligence, quantitative risk simulations, and volatility breakout alerts on Echo and Fire TV.",
+          "description": "MacroPulse bridges hedge fund-grade macro risk management with voice commands and multimodal visual dashboards. Check real-time macro stress regimes (Risk-On / Risk-Off), inspect the 10Y-2Y yield curve and FRED credit spreads, run 10,000-path Monte Carlo VaR simulations, monitor the NVDA Danger Zone index, trigger cross-asset FOMC rate shock tests on your big screen TV, and listen for ambient volatility squeeze chimes.",
+          "examplePhrases": [
+            "Alexa, ask MacroPulse for today's market regime",
+            "Alexa, show the NVDA Danger Zone on the TV",
+            "Alexa, ask MacroPulse to run an FOMC rate shock test",
+            "Alexa, ask MacroPulse if there are any volatility squeeze breakouts on SPY"
+          ],
+          "keywords": [
+            "finance",
+            "hedge fund",
+            "macroeconomics",
+            "stocks",
+            "fire tv",
+            "nvidia",
+            "monte carlo",
+            "fomc",
+            "quant"
+          ],
+          "smallIconUri": "https://storage.googleapis.com/macropulse-public/icons/icon_108.png",
+          "largeIconUri": "https://storage.googleapis.com/macropulse-public/icons/icon_512.png"
+        }
+      },
+      "isAvailableWorldwide": true,
+      "testingInstructions": "Say 'Alexa, ask MacroPulse for today's market regime' or 'Alexa, show the NVDA Danger Zone on the TV'.",
+      "category": "BUSINESS_AND_FINANCE",
+      "distributionCountries": []
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://macro-pulse-652787573242.us-central1.run.app/alexa/skill"
+        },
+        "interfaces": [
+          {
+            "type": "ALEXA_PRESENTATION_APL",
+            "supportedViewports": [
+              {
+                "mode": "TV",
+                "shape": "RECTANGLE",
+                "minWidth": 1280,
+                "maxWidth": 3840,
+                "minHeight": 720,
+                "maxHeight": 2160
+              },
+              {
+                "mode": "HUB",
+                "shape": "RECTANGLE",
+                "minWidth": 1024,
+                "maxWidth": 1920,
+                "minHeight": 600,
+                "maxHeight": 1200
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "manifestVersion": "1.0",
+    "permissions": []
+  }
+}

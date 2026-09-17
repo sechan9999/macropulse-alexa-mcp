@@ -1,0 +1,156 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "macropulse",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": ["cancel", "nevermind"]
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": ["help", "what can you do", "commands", "how does this work"]
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": ["stop", "exit", "close macropulse"]
+        },
+        {
+          "name": "MacroRegimeIntent",
+          "slots": [],
+          "samples": [
+            "what is today's market regime",
+            "market regime",
+            "for today's market regime",
+            "are we in risk on or risk off",
+            "give me this morning's macro stress score",
+            "check market regime status"
+          ]
+        },
+        {
+          "name": "ShowOnTvIntent",
+          "slots": [
+            {
+              "name": "TargetView",
+              "type": "TARGET_VIEW_TYPE"
+            }
+          ],
+          "samples": [
+            "show {TargetView} on the TV",
+            "show the {TargetView} on the TV",
+            "display {TargetView} on the big screen",
+            "put {TargetView} on the television",
+            "show on TV",
+            "display on TV"
+          ]
+        },
+        {
+          "name": "RatesAndSpreadsIntent",
+          "slots": [],
+          "samples": [
+            "check the 10 year Treasury yield and yield curve slope",
+            "what are corporate credit spreads doing",
+            "rates and spreads",
+            "is the yield curve inverted"
+          ]
+        },
+        {
+          "name": "PortfolioShockTestIntent",
+          "slots": [
+            {
+              "name": "Scenario",
+              "type": "FOMC_SCENARIO_TYPE"
+            }
+          ],
+          "samples": [
+            "run an FOMC rate shock test",
+            "run rate shock test on my portfolio",
+            "simulate FOMC shock",
+            "what happens if the Fed hikes 50 basis points",
+            "run {Scenario} shock test"
+          ]
+        },
+        {
+          "name": "NvdaDangerZoneIntent",
+          "slots": [],
+          "samples": [
+            "check if Nvidia is in the Danger Zone",
+            "is NVDA in the danger zone",
+            "Nvidia danger level",
+            "check NVDA danger index",
+            "how extended is NVDA"
+          ]
+        },
+        {
+          "name": "QuantSignalIntent",
+          "slots": [
+            {
+              "name": "Ticker",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "are there any volatility squeeze breakouts on {Ticker}",
+            "scan quant signals on {Ticker}",
+            "what is the quant conviction score on {Ticker}",
+            "check volatility breakout on {Ticker}"
+          ]
+        }
+      ],
+      "types": [
+        {
+          "name": "TARGET_VIEW_TYPE",
+          "values": [
+            {
+              "name": {
+                "value": "NVDA Danger Zone",
+                "synonyms": ["Nvidia danger zone", "danger zone", "nvidia", "nvda"]
+              }
+            },
+            {
+              "name": {
+                "value": "FOMC Shock Test",
+                "synonyms": ["rate shock test", "fomc shock", "portfolio shock", "var shock"]
+              }
+            },
+            {
+              "name": {
+                "value": "Macro Regime",
+                "synonyms": ["market regime", "regime dashboard", "risk on risk off"]
+              }
+            },
+            {
+              "name": {
+                "value": "Quant Signals",
+                "synonyms": ["volatility squeeze", "signals", "breakouts"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "FOMC_SCENARIO_TYPE",
+          "values": [
+            {
+              "name": {
+                "value": "hawkish_50bps",
+                "synonyms": ["hawkish surprise", "50 basis point hike", "rate hike", "hawkish"]
+              }
+            },
+            {
+              "name": {
+                "value": "dovish_50bps",
+                "synonyms": ["dovish pivot", "50 basis point cut", "rate cut", "dovish"]
+              }
+            },
+            {
+              "name": {
+                "value": "stagflation_inversion",
+                "synonyms": ["stagflation", "curve inversion", "credit blowout"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

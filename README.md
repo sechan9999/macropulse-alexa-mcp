@@ -22,9 +22,9 @@ Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, 
 
 ---
 
-## 🎯 11 Analytical Modules
+## 🎯 12 Analytical Modules
 
-The platform is structured into 11 dedicated analytical tabs, each equipped with its own **"How to Read · Math · HF Terms"** institutional methodology expander:
+The platform is structured into 12 dedicated analytical tabs, each equipped with its own **"How to Read · Math · HF Terms"** institutional methodology expander:
 
 ### 1. 📈 Performance & Benchmark Tear Sheet
 * **Cumulative Return (Base = 100)**: Strategy and S&P 500 total return tracked against the SPY ETF benchmark.
@@ -92,6 +92,49 @@ The platform is structured into 11 dedicated analytical tabs, each equipped with
   * **Volatility Breakout Detector**: Alerts when price pierces upper/lower Bollinger Bands following an expansion from a squeeze.
   * **Additive Scoring Engine (-100 to +100)**: Translates trend, momentum, RSI, and volatility squeeze into actionable signals (*Strong Long*, *Long*, *Neutral*, *Short*, *Strong Short*).
 
+### 12. 🎙️ Alexa+ Institutional Copilot & MCP Terminal
+* **Model Context Protocol (MCP)**: Native **Streamable HTTP** (2025-11-25) & SSE transport server.
+* **Voice & Multimodal Simulation**: Interactive browser voice input, audio speech synthesis (TTS), and Echo Show / Fire TV multimodal visual cards.
+* **8 Quantitative MCP Tools**: Real-time programmatic access to Macro Regimes, 10Y/2Y Yield Curve Slopes, FRED Credit Spreads, 10,000-path Monte Carlo VaR, NVDA Danger Zone index, Volatility Squeezes, Ridge Expected Returns, and FOMC Cross-Asset Shocks.
+* **Developer Telemetry**: Live JSON-RPC request/response payload inspector with sub-500ms execution latency.
+
+### 13. 🏦 Multi-Asset Portfolio Sync & FOMC Shock Desk
+* **Read-Only Brokerage Connectors**: Synchronize multi-asset holdings via Alpaca Read-Only API, Interactive Brokers (IBKR) Flex Query, Plaid schema, or institutional presets (Macro Balanced, Tech Growth, Risk Parity, All-Weather).
+* **Cross-Asset VaR & Expected Shortfall**: Full variance-covariance matrix across Equities, Fixed Income/Duration (TLT, IEF, SHY), Commodities (GLD, USO), and Crypto (BTC-USD, ETH-USD) computing 30-day VaR (95%/99%) and marginal component risk.
+* **FOMC Rate Decision Shock Matrix**: Instantaneous scenario stress testing:
+  * *Hawkish Surprise (+50 bps Hike)*: Duration hit (-4.8% TLT), equity multiple compression (-3.5%), USD surge.
+  * *Dovish Pivot (-50 bps Cut)*: Bond rally (+5.2% TLT), tech equity expansion (+4.1%), Gold rally (+3.4%).
+  * *Stagflationary Inversion*: Curve inverts -50 bps, credit spreads widen +120 bps, stocks fall -6.8%, Gold gains +5.2%.
+  * *March 2020 Liquidity Crunch*: Correlated liquidation test across all risk assets.
+* **Fire TV Big Screen View**: High-contrast, large typography 10-foot UI designed for viewing on living room and trading desk wall displays.
+* **Personalized Ambient Audio Chimes**: Procedural harmonic audio cues played on Fire TV / browser when Bollinger Squeeze breakouts, credit spread divergences, or FOMC shocks occur.
+
+---
+
+## 📺 Amazon Fire TV Companion & Appstore Release
+
+MacroPulse includes an official companion package for **Amazon Fire TV** (`firetv/`):
+* **10-Foot UI Experience**: Overscan-safe layout with high-visibility glowing focus rings (`firetv/remote_nav.js`) fully navigable with standard Fire TV Voice Remote D-pad arrow keys (Up, Down, Left, Right, Select, Back).
+* **Hands-Free Alexa Voice Directives**:
+  * *"Alexa, ask MacroPulse for today's market regime"*
+  * *"Alexa, show the NVDA Danger Zone on the TV"*
+  * *"Alexa, run an FOMC rate shock test on my portfolio"*
+* **Alexa Presentation Language (APL 2024.1)**: Full-screen responsive templates (`skills/macropulse-alexa/`) dynamically rendered on Fire TV Stick 4K, Fire TV Cube, and Echo Show devices.
+* **Appstore Metadata**: Production submission guide and asset specifications (`firetv/appstore_listing.md`).
+
+---
+
+## ☁️ 1-Click AWS Marketplace & CloudFormation Release
+
+Deploy MacroPulse to a dedicated enterprise AWS environment in under 5 minutes:
+
+[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](aws/README_AWS_MARKETPLACE.md)
+
+* **Architecture**: AWS ECS Fargate serverless container, Application Load Balancer (ALB), multi-AZ VPC, and AWS Secrets Manager for FRED, Gemini, and Brokerage credentials.
+* **Template**: [`aws/cloudformation.yaml`](aws/cloudformation.yaml)
+* **Automated Deploy Script**: Run `./aws/deploy_cfn.sh macropulse-prod us-east-1`
+* **Documentation**: See [`aws/README_AWS_MARKETPLACE.md`](aws/README_AWS_MARKETPLACE.md) for full configuration options.
+
 ---
 
 ## 🤖 Pre-Market Automation & Scheduled Scans
@@ -113,6 +156,32 @@ The repository includes [`.github/workflows/daily-quant-signal.yml`](.github/wor
 * Fetches the latest market closes.
 * Runs `scripts/daily_signal_alert.py` across core index ETFs and mega-cap tech.
 * Posts formatted markdown summaries directly to GitHub Workflow Summaries and optionally sends a Slack webhook alert.
+
+---
+
+## 🎙️ Alexa+ Model Context Protocol (MCP) & Streamable HTTP
+
+MacroPulse features an open-standard **Model Context Protocol (MCP)** server conforming to the **2025-11-25 Streamable HTTP (SSE)** specification, built specifically for the **Alexa+ Agent Skills** ecosystem:
+
+### 1. Launch the MCP Server
+Run the high-performance server supporting both Streamable HTTP and SSE transports:
+```bash
+python run_alexa_mcp.py --port 8000
+```
+
+### 2. Available Endpoints
+* **Streamable HTTP Endpoint**: `http://localhost:8000/mcp`
+* **SSE Endpoint**: `http://localhost:8000/sse`
+* **Messages Endpoint**: `http://localhost:8000/messages`
+* **Alexa Skills Kit Webhook**: `http://localhost:8000/alexa/skill`
+* **Health Check**: `http://localhost:8000/health`
+* **Alexa Query Simulator API**: `http://localhost:8000/alexa/query`
+
+### 3. Verify Quant MCP Tools Locally
+```bash
+python run_alexa_mcp.py --test-tools
+python -m unittest tests/test_alexa_mcp.py
+```
 
 ---
 

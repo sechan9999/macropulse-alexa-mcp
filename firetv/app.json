@@ -1,0 +1,19 @@
+{
+  "name": "macropulse-firetv",
+  "version": "2.0.0",
+  "displayName": "MacroPulse Institutional Desk",
+  "description": "Fire TV Companion application for MacroPulse macroeconomic intelligence and FOMC shock testing.",
+  "author": "MacroPulse Quantitative Systems",
+  "main": "index.html",
+  "firetv": {
+    "min_sdk_version": 25,
+    "target_sdk_version": 33,
+    "orientation": "landscape",
+    "hardware_acceleration": true,
+    "dpad_navigation": true,
+    "overscan_safe_margins": {
+      "horizontal_pct": 5,
+      "vertical_pct": 5
+    }
+  }
+}

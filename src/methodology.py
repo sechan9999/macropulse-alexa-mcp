@@ -409,6 +409,61 @@ $$\text{score}_t = \text{clip}\Bigl(\textstyle\sum_k w_k \cdot \mathbf{1}[\text{
 * **Advisory signal** — a recommendation and its reasoning, with no order sizing, routing, or execution attached.
 """,
     },
+    # ───────────────────────────────────────────────────────────────
+    "alexa": {
+        "title": "🎙️ Alexa+ & Model Context Protocol (MCP) — Methodology",
+        "chart": """
+* **Interactive Alexa+ Simulator** — Emulates the voice conversational experience of Alexa+ connected to MacroPulse via Streamable HTTP Transport.
+* **Multimodal Card View** — Displays visual tear-sheets and KPI metrics formatted for Echo Show and Fire TV screens.
+* **Agent Skill Execution Trace** — Real-time telemetry displaying the selected MCP tool, latency, extracted arguments, and raw JSON-RPC payload.
+""",
+        "math": r"""
+**Streamable HTTP (Server-Sent Events) Transport**
+$$\text{Client} \xrightarrow{\text{GET /sse}} \text{MCP Server (assigns SessionID)} \xrightarrow{\text{endpoint event}} \text{Client}$$
+$$\text{Client} \xrightarrow{\text{POST /messages?session\_id=...}} \text{JSON-RPC 2.0 Request} \xrightarrow{\text{SSE stream}} \text{Streamed Response}$$
+
+**Parametric Value-at-Risk (Normal Distribution)**
+$$\text{VaR}_\alpha = -(\mu \Delta t + z_\alpha \sigma \sqrt{\Delta t})$$
+
+**Empirical Expected Shortfall (CVaR)**
+$$\text{CVaR}_\alpha = -\mathbb{E}[R \mid R \le -\text{VaR}_\alpha]$$
+""",
+        "terms": """
+* **Model Context Protocol (MCP)** — An open standard allowing LLMs and AI agents (such as Alexa+) to access live tools and context from external systems.
+* **Streamable HTTP Transport** — The 2025-11-25 MCP standard specifying bi-directional communication over HTTP SSE streams and message endpoints.
+* **Agent Skills** — Declarative tool manifests defining capability boundaries, argument schemas, and invocation triggers for Alexa+.
+* **Multimodal Voice Ergonomics** — Pairing concise, natural conversational audio speech with high-density visual telemetry on smart displays.
+""",
+    },
+    # ───────────────────────────────────────────────────────────────
+    "portfolio_fomc": {
+        "title": "🏦 Multi-Asset Portfolio Sync & FOMC Shock Testing — Methodology",
+        "chart": """
+* **Multi-Asset Allocation Breakdown** — Displays capital distribution across Equities, Fixed Income/Duration, Commodities, and Digital Assets.
+* **Marginal Risk Contribution (Component VaR)** — Highlights which asset class or single name drives the greatest portion of portfolio volatility.
+* **FOMC Rate Shock Matrix** — Real-time PnL simulation across four monetary policy scenarios: Hawkish Surprise (+50 bps), Dovish Pivot (-50 bps), Stagflationary Inversion, and Liquidity Crunch.
+* **Big Screen / 10-Foot TV Display** — High-contrast, large-typography mode engineered for Fire TV screens and trading desk wall displays during FOMC rate announcements.
+""",
+        "math": r"""
+**Portfolio Variance & Volatility (Covariance Formulation)**
+$$\sigma_p^2 = \mathbf{w}^T \mathbf{\Sigma} \mathbf{w} = \sum_{i=1}^N \sum_{j=1}^N w_i w_j \sigma_{ij}, \qquad \sigma_p = \sqrt{\mathbf{w}^T \mathbf{\Sigma} \mathbf{w}}$$
+
+**Cross-Asset Parametric Value-at-Risk ($h$-day horizon)**
+$$\text{VaR}_\alpha = - z_\alpha \cdot \sigma_p \sqrt{\frac{h}{252}} \cdot V_0$$
+
+**Marginal Contribution to Risk (MCR) & Component VaR**
+$$\text{MCR}_i = \frac{\partial \sigma_p}{\partial w_i} = \frac{(\mathbf{\Sigma} \mathbf{w})_i}{\sigma_p}, \qquad \text{CVaR}_i = w_i \cdot \text{MCR}_i$$
+
+**FOMC Duration & Factor Sensitivity Shock**
+$$\Delta P_{\text{FI}} \approx -D_{\text{eff}} \cdot \Delta y + \frac{1}{2} C \cdot (\Delta y)^2, \qquad \Delta V_{\text{portfolio}} = \sum_{i=1}^N w_i \cdot \beta_i^{\text{FOMC}}(\Delta r) \cdot V_0$$
+""",
+        "terms": """
+* **Effective Duration ($D_{\text{eff}}$)** — Percentage price change of a bond instrument per 100 bps shift in yields.
+* **FOMC Rate Shock** — An instantaneous, unanticipated shift in the target Federal Funds rate and terminal rate expectations.
+* **Risk Parity** — Allocating capital such that each asset class contributes equally to the total portfolio variance budget.
+* **Cross-Asset Correlation Breakdown** — Tendency of all risk assets to correlate to 1.0 during liquidity flash crunches.
+""",
+    },
 }
 
 

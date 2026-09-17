@@ -1,0 +1,32 @@
+{
+  "name": "MacroPulse Institutional Macro Desk for Fire TV",
+  "short_name": "MacroPulse",
+  "description": "Institutional macro risk intelligence, cross-asset FOMC rate shock tests, and volatility breakout alerts on the big screen.",
+  "start_url": "/?view=tv",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "categories": ["finance", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/icons/tv_icon_192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/tv_icon_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "amazon_fire_tv": {
+    "supported_resolutions": ["1080p", "4k"],
+    "requires_dpad": true,
+    "voice_enabled": true,
+    "alexa_skill_id": "amzn1.ask.skill.macropulse-copilot"
+  }
+}

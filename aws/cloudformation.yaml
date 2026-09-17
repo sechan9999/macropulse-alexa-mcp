@@ -1,0 +1,340 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  MacroPulse Quantitative Macro Desk & Alexa MCP Server.
+  Production-grade 1-Click AWS Deployment on ECS Fargate with Application Load Balancer (ALB),
+  AWS Secrets Manager, and Amazon CloudWatch telemetry.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Application Configuration"
+        Parameters:
+          - EnvironmentName
+          - ContainerImage
+          - TaskCpu
+          - TaskMemory
+      - Label:
+          default: "API Keys & Institutional Credentials"
+        Parameters:
+          - FredApiKey
+          - GeminiApiKey
+          - ReadOnlyBrokerageSecret
+    ParameterLabels:
+      EnvironmentName:
+        default: "Deployment Environment Name"
+      ContainerImage:
+        default: "MacroPulse Docker Image URI"
+      FredApiKey:
+        default: "St. Louis Fed FRED API Key"
+      GeminiApiKey:
+        default: "Google Gemini AI API Key"
+      ReadOnlyBrokerageSecret:
+        default: "Read-Only Brokerage Secret (Alpaca/IBKR)"
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: macropulse-quant
+    Description: Prefix for resources created by this stack.
+
+  ContainerImage:
+    Type: String
+    Default: public.ecr.aws/macropulse/macro-pulse:latest
+    Description: Docker container image URI from Amazon ECR or Docker Hub.
+
+  TaskCpu:
+    Type: String
+    Default: "1024"
+    AllowedValues: ["512", "1024", "2048", "4096"]
+    Description: Fargate Task CPU units (1024 = 1 vCPU).
+
+  TaskMemory:
+    Type: String
+    Default: "2048"
+    AllowedValues: ["1024", "2048", "4096", "8192"]
+    Description: Fargate Task Memory in MiB.
+
+  FredApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Optional FRED API key for St. Louis Fed corporate credit spreads.
+
+  GeminiApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Google Gemini API key for Senior Analyst AI commentary.
+
+  ReadOnlyBrokerageSecret:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Optional read-only credentials for Alpaca or Interactive Brokers sync.
+
+Resources:
+  # ══════════════════════════════════════════════════════════════════
+  # VPC & NETWORKING
+  # ══════════════════════════════════════════════════════════════════
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-vpc"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-igw"
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-1"
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-2"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-public-rt"
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  Subnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  Subnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # ══════════════════════════════════════════════════════════════════
+  # SECURITY GROUPS
+  # ══════════════════════════════════════════════════════════════════
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public access for MacroPulse ALB
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Ingress from ALB to MacroPulse Fargate Container
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8501
+          ToPort: 8501
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+
+  # ══════════════════════════════════════════════════════════════════
+  # SECRETS & LOGGING
+  # ══════════════════════════════════════════════════════════════════
+  ApiSecrets:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub "${EnvironmentName}-api-credentials"
+      Description: API credentials for FRED, Gemini AI, and Brokerage sync
+      SecretString: !Sub |
+        {
+          "FRED_API_KEY": "${FredApiKey}",
+          "GEMINI_API_KEY": "${GeminiApiKey}",
+          "BROKERAGE_SECRET": "${ReadOnlyBrokerageSecret}"
+        }
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${EnvironmentName}-macropulse"
+      RetentionInDays: 30
+
+  # ══════════════════════════════════════════════════════════════════
+  # APPLICATION LOAD BALANCER
+  # ══════════════════════════════════════════════════════════════════
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${EnvironmentName}-alb"
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Type: application
+
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${EnvironmentName}-tg"
+      Port: 8501
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      TargetType: ip
+      HealthCheckPath: /healthz
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  # ══════════════════════════════════════════════════════════════════
+  # ECS FARGATE CLUSTER & SERVICE
+  # ══════════════════════════════════════════════════════════════════
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${EnvironmentName}-cluster"
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${EnvironmentName}-task"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: macropulse-app
+          Image: !Ref ContainerImage
+          PortMappings:
+            - ContainerPort: 8501
+              Protocol: tcp
+            - ContainerPort: 8000
+              Protocol: tcp
+          Environment:
+            - Name: PORT
+              Value: "8501"
+            - Name: MCP_PORT
+              Value: "8000"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref LogGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: macropulse
+
+  ECSService:
+    Type: AWS::ECS::Service
+    DependsOn: ALBListener
+    Properties:
+      ServiceName: !Sub "${EnvironmentName}-service"
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref ECSTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref PublicSubnet1
+            - !Ref PublicSubnet2
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+      LoadBalancers:
+        - ContainerName: macropulse-app
+          ContainerPort: 8501
+          TargetGroupArn: !Ref ALBTargetGroup
+
+Outputs:
+  DashboardURL:
+    Description: Public HTTP URL for the MacroPulse Big-Screen & Web Dashboard
+    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}"
+
+  AlexaMcpEndpoint:
+    Description: Alexa Skills Kit and Model Context Protocol (Streamable HTTP) Endpoint
+    Value: !Sub "http://${ApplicationLoadBalancer.DNSName}:8000/alexa/skill"
+
+  CloudWatchLogsGroup:
+    Description: CloudWatch Log Group for real-time quantitative engine telemetry
+    Value: !Ref LogGroup
