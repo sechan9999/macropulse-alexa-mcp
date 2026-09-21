@@ -29,8 +29,14 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 logger = logging.getLogger("MacroPulse-BrokerageSync")
+
+STRESS_NOTE = (
+    "Illustrative, assumption-based stress test (hard-coded shocks, volatilities and "
+    "correlations - not estimated from live data). Not a forecast or investment advice."
+)
 
 # Default asset class mapping
 ASSET_CLASSES = {
@@ -49,9 +55,9 @@ ASSET_CLASSES = {
     "ETH-USD": "Digital Assets",
 }
 
-# Empirical FOMC sensitivity betas (% move per 25 bps rate surprise)
+# Illustrative stress assumptions - NOT estimated from data.
 FOMC_SENSITIVITIES = {
-    # Ticker: (hawkish_pct_per_50bps, stagflation_pct, liquidity_pct)
+    # Ticker: (hawkish +50bps shock, stagflation shock, liquidity-crunch shock), as fractional returns
     "SPY": (-0.035, -0.068, -0.095),
     "QQQ": (-0.045, -0.078, -0.115),
     "AAPL": (-0.038, -0.065, -0.090),
@@ -111,10 +117,9 @@ class BrokeragePortfolio:
 
     def _normalize(self):
         total_w = sum(self.holdings.values())
-        if total_w > 0:
-            self.weights = {k: v / total_w for k, v in self.holdings.items()}
-        else:
-            self.weights = {"SPY": 1.0}
+        if total_w <= 0:
+            raise ValueError(f"{self.source}: portfolio has no positive holdings")
+        self.weights = {k: v / total_w for k, v in self.holdings.items()}
 
     @classmethod
     def from_alpaca_json(cls, payload: List[Dict[str, Any]]) -> BrokeragePortfolio:
@@ -127,7 +132,7 @@ class BrokeragePortfolio:
             if sym and mkt_val > 0:
                 holdings[sym] = mkt_val
                 total_val += mkt_val
-        return cls(holdings=holdings, total_value_usd=total_val or 500_000.0, source="Alpaca Read-Only")
+        return cls(holdings=holdings, total_value_usd=total_val, source="Alpaca Read-Only")
 
     @classmethod
     def from_ibkr_json(cls, payload: List[Dict[str, Any]]) -> BrokeragePortfolio:
@@ -140,7 +145,7 @@ class BrokeragePortfolio:
             if sym and mkt_val > 0:
                 holdings[sym] = mkt_val
                 total_val += mkt_val
-        return cls(holdings=holdings, total_value_usd=total_val or 750_000.0, source="IBKR Read-Only")
+        return cls(holdings=holdings, total_value_usd=total_val, source="IBKR Read-Only")
 
     @classmethod
     def from_plaid_json(cls, payload: Dict[str, Any]) -> BrokeragePortfolio:
@@ -156,7 +161,7 @@ class BrokeragePortfolio:
             if sym and val > 0:
                 holdings[sym] = val
                 total_val += val
-        return cls(holdings=holdings, total_value_usd=total_val or 1_000_000.0, source="Plaid Read-Only")
+        return cls(holdings=holdings, total_value_usd=total_val, source="Plaid Read-Only")
 
     @classmethod
     def from_preset(cls, preset_name: str, total_value_usd: float = 1_000_000.0) -> BrokeragePortfolio:
@@ -175,7 +180,7 @@ class BrokeragePortfolio:
         """
         Computes multi-asset portfolio parametric VaR and CVaR (Expected Shortfall).
         """
-        # Historical baseline asset annualized volatilities
+        # Hard-coded long-run annualized volatility assumptions (not estimated from live data)
         base_vols = {
             "SPY": 0.16, "QQQ": 0.21, "AAPL": 0.22, "NVDA": 0.42, "MSFT": 0.20,
             "IWM": 0.23, "TLT": 0.15, "IEF": 0.08, "SHY": 0.03, "GLD": 0.14,
@@ -212,10 +217,12 @@ class BrokeragePortfolio:
         t_factor = np.sqrt(horizon_days / 252.0)
         port_horizon_vol = port_ann_vol * t_factor
 
-        z_score = 1.645 if confidence == 95 else 2.326
+        if not 50 < confidence < 100:
+            raise ValueError(f"confidence must be between 50 and 100 (exclusive), got {confidence}")
+        z_score = float(norm.ppf(confidence / 100.0))
         var_pct = -1.0 * z_score * port_horizon_vol
         # CVaR (Expected Shortfall for normal distribution)
-        pdf = (1.0 / np.sqrt(2 * np.pi)) * np.exp(-0.5 * (z_score ** 2))
+        pdf = float(norm.pdf(z_score))
         alpha = (100 - confidence) / 100.0
         cvar_pct = -1.0 * (pdf / alpha) * port_horizon_vol
 
@@ -237,7 +244,8 @@ class BrokeragePortfolio:
             "cvar_pct": round(cvar_pct * 100, 2),
             "cvar_dollar": round(cvar_dollar, 2),
             "risk_contributions": risk_contrib_by_ticker,
-            "asset_classes": self.get_allocation_by_asset_class()
+            "asset_classes": self.get_allocation_by_asset_class(),
+            "method_note": STRESS_NOTE,
         }
 
     def simulate_fomc_shock(self, scenario: str = "hawkish_50bps") -> Dict[str, Any]:
@@ -287,7 +295,7 @@ class BrokeragePortfolio:
         # Spoken Alexa response for TV
         direction = "loss" if total_pnl_dollar < 0 else "gain"
         spoken = (
-            f"Under the {name} scenario, your {self.source} portfolio experiences an estimated "
+            f"In this illustrative stress test, under the {name} scenario, your {self.source} portfolio experiences an estimated "
             f"{direction} of {abs(total_pnl_pct)*100:.1f}%, or {abs(total_pnl_dollar):,.0f} dollars. "
             f"Equities and duration face {'contraction' if total_pnl_dollar < 0 else 'expansion'}, "
             f"bringing stressed portfolio equity to {stressed_value:,.0f} dollars."
@@ -303,5 +311,6 @@ class BrokeragePortfolio:
             "total_pnl_pct": round(total_pnl_pct * 100, 2),
             "total_pnl_dollar": round(total_pnl_dollar, 2),
             "breakdown_by_ticker": ticker_shocks,
-            "alexa_spoken_response": spoken
+            "alexa_spoken_response": spoken,
+            "method_note": STRESS_NOTE,
         }

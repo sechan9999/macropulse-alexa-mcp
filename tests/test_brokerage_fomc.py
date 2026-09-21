@@ -38,6 +38,36 @@ class TestBrokerageFOMC(unittest.TestCase):
         self.assertTrue(var_res["cvar_pct"] <= var_res["var_pct"])  # CVaR is worse than VaR
         self.assertTrue(var_res["annualized_volatility_pct"] > 5.0)
 
+    def test_empty_payload_is_rejected_not_invented(self):
+        # An empty/zero-value payload must not silently become a made-up $500k-$1M portfolio.
+        for parser in (BrokeragePortfolio.from_alpaca_json, BrokeragePortfolio.from_ibkr_json):
+            with self.assertRaises(ValueError):
+                parser([])
+            with self.assertRaises(ValueError):
+                parser([{"symbol": "SPY", "market_value": "0", "ticker": "SPY", "mktVal": 0}])
+        with self.assertRaises(ValueError):
+            BrokeragePortfolio.from_plaid_json({"holdings": [], "securities": []})
+        with self.assertRaises(ValueError):
+            BrokeragePortfolio({}, 1_000_000.0)
+
+    def test_var_confidence_levels(self):
+        port = BrokeragePortfolio.from_preset("Macro Balanced (60/40 Modern)", 1_000_000.0)
+        v90 = port.compute_cross_asset_var(confidence=90)["var_pct"]
+        v95 = port.compute_cross_asset_var(confidence=95)["var_pct"]
+        v99 = port.compute_cross_asset_var(confidence=99)["var_pct"]
+        self.assertGreater(v90, v95)          # less negative at lower confidence
+        self.assertGreater(v95, v99)
+        self.assertAlmostEqual(v99 / v95, 2.326 / 1.645, places=2)
+        with self.assertRaises(ValueError):
+            port.compute_cross_asset_var(confidence=100)
+
+    def test_outputs_disclose_assumptions(self):
+        port = BrokeragePortfolio.from_preset("Macro Balanced (60/40 Modern)", 1_000_000.0)
+        self.assertIn("assumption", port.compute_cross_asset_var()["method_note"])
+        shock = port.simulate_fomc_shock("hawkish_50bps")
+        self.assertIn("assumption", shock["method_note"])
+        self.assertIn("illustrative", shock["alexa_spoken_response"])
+
     def test_fomc_shock_scenarios(self):
         port = BrokeragePortfolio.from_preset("Macro Balanced (60/40 Modern)", 1_000_000.0)
         
