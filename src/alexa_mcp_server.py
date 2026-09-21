@@ -36,18 +36,25 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-# FastMCP from the official MCP SDK
+# MCP server class from the official SDK. mcp>=2 renamed FastMCP -> MCPServer
+# (mcp.server.mcpserver); mcp 1.x only has mcp.server.fastmcp.FastMCP. Both are
+# exposed here under the name FastMCP so the rest of the module is version-agnostic.
 try:
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer as FastMCP
+    _MCP_V2 = True
     _FASTMCP_AVAILABLE = True
 except ImportError:
-    FastMCP = None
-    _FASTMCP_AVAILABLE = False
+    _MCP_V2 = False
+    try:
+        from mcp.server.fastmcp import FastMCP
+        _FASTMCP_AVAILABLE = True
+    except ImportError:
+        FastMCP = None
+        _FASTMCP_AVAILABLE = False
 
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
-from starlette.routing import Route
-from starlette.middleware import Middleware
+from starlette.routing import Mount
 from starlette.middleware.cors import CORSMiddleware
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -413,13 +420,21 @@ def execute_ask_macro_analyst(query: str) -> Dict[str, Any]:
 
 def create_mcp_server() -> FastMCP:
     """Instantiates the FastMCP server registering all MacroPulse tools."""
+    if FastMCP is None:
+        raise RuntimeError("The 'mcp' package is not installed (pip install 'mcp>=2.0.0').")
+    # mcp 1.x takes transport settings on the constructor; mcp 2.x takes them on
+    # streamable_http_app()/sse_app() instead (see build_starlette_app).
+    # host="0.0.0.0" matters in both: the SDK auto-enables DNS-rebinding protection
+    # (rejecting any non-localhost Host header, e.g. an ALB or domain) for 127.0.0.1.
+    v1_settings = {} if _MCP_V2 else {"host": "0.0.0.0", "stateless_http": True}
     server = FastMCP(
         "MacroPulse-Alexa",
         instructions=(
             "You are MacroPulse, an institutional-grade quantitative strategist and risk desk for Alexa+. "
             "Use the provided tools to deliver hedge-fund caliber macro intelligence, Monte Carlo simulations, "
             "and volatility breakout alerts directly to investors."
-        )
+        ),
+        **v1_settings,
     )
 
     @server.tool(name="get_macro_regime", description="Get current market regime (Risk-On/Neutral/Risk-Off), macro stress z-scores, S&P 500, and historical win rates.")
@@ -569,25 +584,27 @@ async def alexa_skill_webhook_endpoint(request):
 def build_starlette_app() -> Starlette:
     """Assembles the complete Starlette application hosting Streamable HTTP & SSE."""
     fastmcp_server = create_mcp_server()
-    
-    # Get Streamable HTTP app from FastMCP
-    streamable_app = fastmcp_server.streamable_http_app()
-    sse_app = fastmcp_server.sse_app()
-    
-    routes = [
-        Route("/health", health_endpoint, methods=["GET"]),
-        Route("/alexa/query", alexa_query_endpoint, methods=["POST"]),
-        Route("/alexa/skill", alexa_skill_webhook_endpoint, methods=["POST"]),
-    ]
-    
-    middleware = [
-        Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-    ]
-    
-    app = Starlette(routes=routes, middleware=middleware)
-    # Mount FastMCP Streamable HTTP sub-application
-    app.mount("/mcp", streamable_app)
-    app.mount("/sse", sse_app)
+
+    # The health/Alexa endpoints are registered on the MCP server itself so they live in
+    # the SAME Starlette app as /mcp. Mounting the MCP app inside another Starlette app
+    # does not run its lifespan, and every /mcp request then fails with
+    # "Task group is not initialized. Make sure to use run()".
+    fastmcp_server.custom_route("/health", methods=["GET"])(health_endpoint)
+    fastmcp_server.custom_route("/alexa/query", methods=["POST"])(alexa_query_endpoint)
+    fastmcp_server.custom_route("/alexa/skill", methods=["POST"])(alexa_skill_webhook_endpoint)
+
+    if _MCP_V2:
+        # Stateless: every tool is a pure function, so no per-session state is needed and
+        # the server can sit behind a load balancer with several tasks (ECS Fargate/ALB).
+        app = fastmcp_server.streamable_http_app(stateless_http=True, host="0.0.0.0")
+        sse_app = fastmcp_server.sse_app(host="0.0.0.0")
+    else:
+        app = fastmcp_server.streamable_http_app()
+        sse_app = fastmcp_server.sse_app()
+
+    # Legacy SSE transport at /sse and /messages/ (mounted last so it never shadows /mcp).
+    app.router.routes.append(Mount("/", app=sse_app))
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
     return app
 
 
