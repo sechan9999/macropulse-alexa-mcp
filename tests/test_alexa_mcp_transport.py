@@ -15,9 +15,11 @@ import socket
 import threading
 import time
 import unittest
+from unittest import mock
 
 import uvicorn
 
+import src.alexa_mcp_server as srv
 from src.alexa_mcp_server import _FASTMCP_AVAILABLE, build_starlette_app
 
 try:
@@ -33,8 +35,9 @@ except ImportError:  # pragma: no cover
 EXPECTED_TOOLS = {
     "get_macro_regime", "get_rates_and_spreads", "simulate_portfolio_risk",
     "check_nvda_danger_zone", "scan_quant_signals", "get_expected_returns",
-    "ask_macro_analyst", "simulate_fomc_shock",
+    "simulate_fomc_shock",
 }
+NOT_MCP_TOOLS = {"ask_macro_analyst"}  # a synchronous LLM call cannot meet the 500 ms budget
 
 
 def _free_port() -> int:
@@ -50,7 +53,7 @@ class TestMcpTransports(unittest.TestCase):
     def setUpClass(cls):
         cls.port = _free_port()
         cls.server = uvicorn.Server(uvicorn.Config(
-            build_starlette_app(), host="127.0.0.1", port=cls.port, log_level="warning"))
+            build_starlette_app(warm_up=False), host="127.0.0.1", port=cls.port, log_level="warning"))
         cls.thread = threading.Thread(target=cls.server.run, daemon=True)
         cls.thread.start()
         deadline = time.time() + 30
@@ -80,12 +83,31 @@ class TestMcpTransports(unittest.TestCase):
                 return tools, result
 
     def _assert_roundtrip(self, tools, result):
-        self.assertTrue(EXPECTED_TOOLS <= tools, f"missing tools: {EXPECTED_TOOLS - tools}")
+        self.assertEqual(EXPECTED_TOOLS, tools)
+        self.assertFalse(NOT_MCP_TOOLS & tools)
         is_error = getattr(result, "is_error", getattr(result, "isError", False))  # v2 snake_case / v1 camelCase
         self.assertFalse(is_error)
         payload = json.loads(result.content[0].text)
         self.assertEqual(payload["status"], "success")
         self.assertLess(payload["total_pnl_dollar"], 0)  # a hawkish surprise hurts the preset
+
+    async def _call(self, client_cm, name, args):
+        async with client_cm as streams:
+            async with ClientSession(streams[0], streams[1]) as session:
+                await session.initialize()
+                return await session.call_tool(name, args)
+
+    def test_data_outage_is_an_mcp_error_and_never_fake_data(self):
+        srv._cache.clear()
+        self.addCleanup(srv._cache.clear)
+        url = f"http://127.0.0.1:{self.port}/mcp"
+        with mock.patch.object(srv, "_raw_download", side_effect=RuntimeError("yahoo down")):
+            result = asyncio.run(asyncio.wait_for(
+                self._call(http_client(url), "scan_quant_signals", {"ticker": "SPY"}), timeout=60))
+        self.assertTrue(getattr(result, "is_error", getattr(result, "isError", False)))
+        text = result.content[0].text
+        self.assertIn("market data", text)
+        self.assertNotIn("BUY", text)  # the old fallback invented a BUY signal at $560
 
     def test_health(self):
         status, data = self._http("GET", "/health")

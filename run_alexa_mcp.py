@@ -41,7 +41,7 @@ def run_tests():
         ("3. Monte Carlo VaR Simulation", lambda: execute_simulate_portfolio_risk("SPY", 95, 30, 2000)),
         ("4. NVDA Danger Zone Engine", execute_check_nvda_danger_zone),
         ("5. Quant Volatility Signals", lambda: execute_scan_quant_signals("SPY")),
-        ("6. Ridge Expected Returns", execute_get_expected_returns),
+        ("6. Reference Expected Returns", execute_get_expected_returns),
         ("7. FOMC Cross-Asset Shock Test", lambda: execute_simulate_fomc_shock("hawkish_50bps")),
     ]
     

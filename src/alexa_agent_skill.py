@@ -17,6 +17,7 @@ Handles:
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -30,6 +31,7 @@ from src.alexa_mcp_server import (
     execute_scan_quant_signals,
     execute_get_expected_returns,
     execute_ask_macro_analyst,
+    MarketDataUnavailable,
 )
 from src.brokerage_sync import BrokeragePortfolio
 
@@ -232,7 +234,33 @@ class AlexaMacroSkill:
 
     @classmethod
     def execute(cls, prompt: str) -> Dict[str, Any]:
-        """Dispatches prompt to tool, generating speech text, display cards, and Fire TV APL."""
+        """Dispatches prompt to a tool. If live market data is unavailable the result is an
+        honest spoken error card (status "error"), never an answer from made-up numbers."""
+        try:
+            return cls._execute(prompt)
+        except MarketDataUnavailable as e:
+            logging.getLogger("MacroPulse-AlexaSkill").warning("Market data unavailable: %s", e)
+            speech = "I can't reach live market data right now, so I won't guess. Please try again in a minute."
+            card = {"title": "Market data unavailable", "subtitle": "Live data could not be fetched",
+                    "badges": [], "sentiment": "neutral"}
+            return {
+                "status": "error",
+                "prompt": prompt,
+                "is_tv_request": False,
+                "tool_selected": "market_data_unavailable",
+                "tool_args": {},
+                "spoken_response": speech,
+                "display_card": card,
+                "apl_document": cls.generate_apl_document(
+                    title=card["title"], subtitle=card["subtitle"], sentiment="neutral",
+                    badges=[], speech_text=speech),
+                "raw_payload": {"status": "error", "error": "market_data_unavailable", "message": str(e)},
+                "latency_ms": 0,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+    @classmethod
+    def _execute(cls, prompt: str) -> Dict[str, Any]:
         tool_name, args = cls.identify_intent(prompt)
         start_time = datetime.now()
         is_tv = args.get("is_tv_request", False)
@@ -328,8 +356,8 @@ class AlexaMacroSkill:
         elif tool_name == "get_expected_returns":
             raw = execute_get_expected_returns()
             card = {
-                "title": "Expanding Ridge Expected Return",
-                "subtitle": "12-Month S&P 500 Macro Forecast",
+                "title": "Reference Expected Return",
+                "subtitle": "12-Month S&P 500 (static reference estimate)",
                 "badges": [
                     {"label": "Expected Return", "value": f"{raw['expected_return_pct']:+.1f}%"},
                     {"label": "1σ Lower Bound", "value": f"{raw['lower_1sigma_pct']:+.1f}%"},
