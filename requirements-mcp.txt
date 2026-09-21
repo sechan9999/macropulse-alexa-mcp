@@ -1,0 +1,11 @@
+# Runtime dependencies of run_alexa_mcp.py only (the Alexa+ MCP server image, Dockerfile.mcp).
+# Derived from the import closure of run_alexa_mcp.py -> src/alexa_mcp_server.py,
+# src/alexa_agent_skill.py, src/brokerage_sync.py, src/ambient_audio.py. starlette comes with mcp.
+# Version bounds match requirements.txt. The Streamlit app keeps using requirements.txt.
+pandas>=2.2.0,<3.1
+numpy>=1.26.0,<2.1
+scipy>=1.14.0
+yfinance>=0.2.50
+google-genai>=1.0.0
+mcp>=2.0.0
+uvicorn>=0.29.0

@@ -1,0 +1,13 @@
+.git
+.github
+.claude
+firetv-app
+firetv
+docs
+signals
+__pycache__
+**/__pycache__
+*.pyc
+.env
+.env.*
+!.env.example

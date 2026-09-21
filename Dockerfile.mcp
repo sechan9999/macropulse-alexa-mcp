@@ -1,0 +1,22 @@
+# Container for the Alexa+ MCP server (run_alexa_mcp.py). The repo's ./Dockerfile runs the
+# Streamlit app instead; this one exists so AWS (ECS Express Mode, which has no start-command
+# override in its simple form) can run the MCP server from the image's own CMD.
+# It installs requirements-mcp.txt (8 packages) instead of the app's full requirements.txt.
+#
+#   docker build -f Dockerfile.mcp -t macropulse-alexa-mcp .
+#   docker run --rm -p 8080:8080 macropulse-alexa-mcp   # then GET http://localhost:8080/health
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements-mcp.txt .
+RUN pip install --no-cache-dir -r requirements-mcp.txt
+
+COPY . .
+
+EXPOSE 8080
+
+ENV PORT=8080 \
+    PYTHONUNBUFFERED=1
+
+CMD ["python", "run_alexa_mcp.py", "--host", "0.0.0.0", "--port", "8080"]
