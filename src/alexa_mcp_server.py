@@ -772,6 +772,35 @@ async def alexa_skill_webhook_endpoint(request):
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
+async def root_endpoint(request):
+    """Landing response for a browser opening the bare service URL."""
+    return JSONResponse({
+        "service": "MacroPulse Alexa+ MCP Server",
+        "status": "ok",
+        "mcp_endpoint": "/mcp",
+        "note": "MCP Streamable HTTP is served at /mcp and also at this base URL.",
+        "health": "/health",
+    })
+
+
+class _RootMcpAlias:
+    """ASGI middleware: accept MCP Streamable HTTP at the base URL as well as at /mcp, so a
+    registration that uses the bare host (https://host) works. A plain browser GET / is left
+    alone and reaches root_endpoint."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope["path"] in ("", "/"):
+            accept = dict(scope["headers"]).get(b"accept", b"")
+            is_mcp = scope["method"] in ("POST", "DELETE") or (
+                scope["method"] == "GET" and b"text/event-stream" in accept)
+            if is_mcp:
+                scope = dict(scope, path="/mcp", raw_path=b"/mcp")
+        await self.app(scope, receive, send)
+
+
 def build_starlette_app(warm_up: bool = True) -> Starlette:
     """Assembles the complete Starlette application hosting Streamable HTTP & SSE.
 
@@ -788,6 +817,7 @@ def build_starlette_app(warm_up: bool = True) -> Starlette:
     fastmcp_server.custom_route("/health", methods=["GET"])(health_endpoint)
     fastmcp_server.custom_route("/alexa/query", methods=["POST"])(alexa_query_endpoint)
     fastmcp_server.custom_route("/alexa/skill", methods=["POST"])(alexa_skill_webhook_endpoint)
+    fastmcp_server.custom_route("/", methods=["GET"])(root_endpoint)
 
     if _MCP_V2:
         # Stateless: every tool is a pure function, so no per-session state is needed and
@@ -801,6 +831,7 @@ def build_starlette_app(warm_up: bool = True) -> Starlette:
     # Legacy SSE transport at /sse and /messages/ (mounted last so it never shadows /mcp).
     app.router.routes.append(Mount("/", app=sse_app))
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+    app.add_middleware(_RootMcpAlias)
     return app
 
 

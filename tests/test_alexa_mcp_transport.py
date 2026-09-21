@@ -109,6 +109,18 @@ class TestMcpTransports(unittest.TestCase):
         self.assertIn("market data", text)
         self.assertNotIn("BUY", text)  # the old fallback invented a BUY signal at $560
 
+    def test_base_url_shows_a_landing_page_for_browsers(self):
+        status, data = self._http("GET", "/", headers={"Accept": "text/html"})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(data)["mcp_endpoint"], "/mcp")
+
+    def test_mcp_also_works_at_the_base_url(self):
+        # an add-on registered with the bare host must not get a 404
+        url = f"http://127.0.0.1:{self.port}/"
+        tools, result = asyncio.run(asyncio.wait_for(
+            self._session_roundtrip(http_client(url)), timeout=60))
+        self._assert_roundtrip(tools, result)
+
     def test_health(self):
         status, data = self._http("GET", "/health")
         self.assertEqual(status, 200)
