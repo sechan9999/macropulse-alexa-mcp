@@ -147,6 +147,12 @@
                 "value": "stagflation_inversion",
                 "synonyms": ["stagflation", "curve inversion", "credit blowout"]
               }
+            },
+            {
+              "name": {
+                "value": "liquidity_cascade",
+                "synonyms": ["liquidity crunch", "liquidity cascade", "flash crash", "dash for cash", "liquidity"]
+              }
             }
           ]
         }

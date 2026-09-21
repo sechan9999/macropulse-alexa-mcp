@@ -88,6 +88,8 @@ class AlexaMacroSkill:
                 scenario = "dovish_50bps"
             elif "stagflation" in p_low or "inversion" in p_low:
                 scenario = "stagflation_inversion"
+            elif any(k in p_low for k in ("liquidity", "crunch", "cascade", "flash crash", "dash for cash")):
+                scenario = "liquidity_cascade"
             args["scenario"] = scenario
             return "simulate_fomc_shock", args
 

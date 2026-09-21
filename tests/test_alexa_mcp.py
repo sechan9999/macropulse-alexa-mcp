@@ -97,6 +97,35 @@ class TestAlexaMacroMCP(unittest.TestCase):
         self.assertEqual(output["status"], "success")
         self.assertIn("total_pnl_pct", output["raw_payload"])
 
+    def test_fomc_scenarios_route_by_voice(self):
+        cases = {
+            "Alexa, run FOMC hawkish shock test": "hawkish_50bps",
+            "Alexa, run FOMC dovish cut shock test": "dovish_50bps",
+            "Alexa, run FOMC stagflation shock test": "stagflation_inversion",
+            "Alexa, run FOMC liquidity crunch shock test": "liquidity_cascade",
+            "Alexa, run FOMC flash crash shock test": "liquidity_cascade",
+        }
+        for prompt, expected in cases.items():
+            tool, args = AlexaMacroSkill.identify_intent(prompt)
+            self.assertEqual(tool, "simulate_fomc_shock", prompt)
+            self.assertEqual(args["scenario"], expected, prompt)
+
+    def test_voice_model_scenarios_match_the_engine(self):
+        # Every scenario the engine can run must be reachable from the Alexa interaction model.
+        import json
+        from src.brokerage_sync import BrokeragePortfolio
+        model = json.load(open("skills/macropulse-alexa/interaction_model.json", encoding="utf-8"))
+        types = {t["name"]: t for t in model["interactionModel"]["languageModel"]["types"]}
+        ids = [v["name"]["value"] for v in types["FOMC_SCENARIO_TYPE"]["values"]]
+        self.assertEqual(len(ids), 4)
+        port = BrokeragePortfolio.from_preset("Macro Balanced (60/40 Modern)", 1_000_000.0)
+        titles = set()
+        for scenario_id in ids:
+            result = port.simulate_fomc_shock(scenario_id)
+            self.assertEqual(result["scenario"], scenario_id)
+            titles.add(result["scenario_title"])
+        self.assertEqual(len(titles), 4)  # none silently falls back to the hawkish default
+
     def test_alexa_ask_webhook_lifecycle(self):
         # LaunchRequest
         launch_req = {"request": {"type": "LaunchRequest"}}
