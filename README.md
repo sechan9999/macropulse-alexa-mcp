@@ -9,7 +9,7 @@
 
 **Macro Pulse** is an institutional-grade financial intelligence and quantitative screening platform. It bridges the gap between retail technical indicators (simple 14-day RSI and moving averages) and hedge-fund macro risk management (credit spreads, yield-curve dynamics, regime-switching models, walk-forward strategy backtesting, and AI-driven macro commentary).
 
-Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, **Google BigQuery**, and **Google Gemini AI**, Macro Pulse integrates 11 specialized analytical modules into a unified, free, real-time web dashboard.
+Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, **Google BigQuery**, and **Google Gemini AI**, Macro Pulse integrates 13 specialized analytical modules into a unified, free, real-time web dashboard.
 
 ---
 
@@ -22,9 +22,9 @@ Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, 
 
 ---
 
-## 🎯 12 Analytical Modules
+## 🎯 13 Analytical Modules
 
-The platform is structured into 12 dedicated analytical tabs, each equipped with its own **"How to Read · Math · HF Terms"** institutional methodology expander:
+The platform is structured into 13 dedicated analytical tabs, each equipped with its own **"How to Read · Math · HF Terms"** institutional methodology expander:
 
 ### 1. 📈 Performance & Benchmark Tear Sheet
 * **Cumulative Return (Base = 100)**: Strategy and S&P 500 total return tracked against the SPY ETF benchmark.

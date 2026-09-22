@@ -224,7 +224,7 @@ def generate_signal(ticker: str, df: pd.DataFrame) -> Signal:
 # ══════════════════════════════════════════════════════════════════
 def _scan_one(ticker: str, period: str) -> Signal:
     try:
-        raw = yf.Ticker(ticker).history(period=period, auto_adjust=True)
+        raw = yf.Ticker(ticker).history(period=period, auto_adjust=True, timeout=20)
         if raw is None or raw.empty:
             return Signal(ticker, float("nan"), "HOLD", 0, "Unknown", "—",
                           ["데이터 없음"], error="no_data")

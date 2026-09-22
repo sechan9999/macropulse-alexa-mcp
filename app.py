@@ -480,7 +480,14 @@ def _screen_one(ticker: str, period_days: int):
         else:
             ytd_raw = np.nan
         mktcap = getattr(fi,"market_cap", None)
-        pe     = getattr(fi,"p_e_ratio", None)
+        # tkr.info is the flakiest yfinance endpoint: isolate it so a failure
+        # here can't discard an otherwise good row.
+        pe = getattr(fi, "p_e_ratio", None)
+        if pe is None:
+            try:
+                pe = tkr.info.get("trailingPE")
+            except Exception:
+                pe = None
         # SMA guard — fix #3
         sma200 = hist["Close"].rolling(200).mean().iloc[-1]
         if np.isnan(sma200):
@@ -500,7 +507,7 @@ def _screen_one(ticker: str, period_days: int):
             "RSI":    round(rsi, 1),
             "SMA200": sma200_signal,
             "Mkt Cap": mktcap,
-            "P/E": pe or tkr.info.get("trailingPE") if pe is None else pe,
+            "P/E": pe,
         }
     except Exception:
         return None
@@ -1002,7 +1009,9 @@ with tab4:
         exp = compute_expected_returns(_hash, df_raw)
         source_label = "yfinance macro model (live)"
 
-    if exp is not None and not exp.empty:
+    exp_ok = exp is not None and not exp.empty and not exp["exp_ann_return"].dropna().empty
+
+    if exp_ok:
         roll_std = exp["pred_std"].fillna(exp["exp_ann_return"].rolling(12).std())
         latest_pred = exp["exp_ann_return"].dropna().iloc[-1]
 
@@ -1110,6 +1119,9 @@ with tab5:
     if run_btn:
         with st.spinner("🔎 Scanning tickers in parallel…"):
             sc_df = run_screener(universe, period_days)
+        if sc_df.empty:
+            st.warning("⚠️ No results — every ticker fetch failed. yfinance may be rate-limited "
+                       "or the network hiccuped. Wait a minute, try fewer tickers, or press 🔄 Reload Data.")
     else:
         sc_df = pd.DataFrame()
 
@@ -1626,7 +1638,7 @@ def fetch_nvda_full(period_days: int = 365):
 
     # ── NVDA daily OHLCV ────────────────────────────────────────────────
     nvda = yf.Ticker("NVDA")
-    df_nvda = nvda.history(period=f"{period_days}d", auto_adjust=True)
+    df_nvda = nvda.history(period=f"{period_days}d", auto_adjust=True, timeout=20)
     if df_nvda.empty:
         return {}, {}
 
@@ -1667,7 +1679,7 @@ def fetch_nvda_full(period_days: int = 365):
     df["ba_imbalance"] = (df["Close"] - df["mid"]) / (df["High"] - df["Low"] + 1e-3) * 100
 
     # ── 5. Put/Call skew proxy via VIX divergence ────────────────────────
-    vix_raw = yf.download("^VIX", period=f"{period_days}d", auto_adjust=True, progress=False, multi_level_index=False)["Close"]
+    vix_raw = yf.download("^VIX", period=f"{period_days}d", auto_adjust=True, progress=False, multi_level_index=False, timeout=20)["Close"]
     if isinstance(vix_raw, pd.DataFrame):
         vix_raw = vix_raw.iloc[:, 0]
     vix = vix_raw.tz_localize(None) if hasattr(vix_raw.index, 'tz') and vix_raw.index.tz is not None else vix_raw
@@ -1773,7 +1785,11 @@ with tab9:
     df_nv, df_ctx_nv = None, {}
     if load_nvda:
         with st.spinner("🔥 Computing NVDA Danger Index…"):
-            df_nv, df_ctx_nv = fetch_nvda_full(nvda_days)
+            try:
+                df_nv, df_ctx_nv = fetch_nvda_full(nvda_days)
+            except Exception as e:
+                df_nv, df_ctx_nv = None, {}
+                st.error(f"❌ NVDA fetch failed: {e}. The data source may be rate-limited — try again in a minute.")
 
     if df_nv is None or (isinstance(df_nv, dict) and len(df_nv) == 0):
         if load_nvda:
@@ -2558,7 +2574,13 @@ with tab12:
 
         # ── 1. Spoken Audio Voice Response Box ──
         spoken = res.get("spoken_response", "")
-        escaped_spoken = spoken.replace('"', '\\"').replace("'", "\\'").replace("\n", " ")
+        # Escape for a JS single-quoted string: backslash FIRST, or any
+        # backslash in the original text (e.g. "10\%") escapes the next
+        # char and breaks the ▶ Play button's onclick handler.
+        escaped_spoken = (spoken.replace("\\", "\\\\")
+                                .replace("'", "\\'")
+                                .replace('"', "\\\"")
+                                .replace("\n", " "))
 
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.95));
