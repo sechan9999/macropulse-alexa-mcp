@@ -30,6 +30,7 @@ except Exception as _e:
     raise
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 if _import_errors:
     st.warning(f"Some packages failed to import: {_import_errors}")
@@ -2582,10 +2583,18 @@ with tab12:
                                 .replace('"', "\\\"")
                                 .replace("\n", " "))
 
-        st.markdown(f"""
+        # Rendered via components.html (an iframe) rather than st.markdown, because
+        # Streamlit strips inline onclick handlers from st.markdown for security, which
+        # left the ▶️ Play button dead. In a component iframe the script actually runs.
+        _box_h = 172 + (len(spoken) // 80) * 26
+        components.html(f"""
+        <style>
+          body {{ margin:0; background:transparent;
+                  font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }}
+        </style>
         <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.95));
                     border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; padding: 22px;
-                    margin: 18px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.4);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div style="display:flex; align-items:center; gap:10px;">
               <span style="font-size:1.4rem;">🔊</span>
@@ -2598,13 +2607,14 @@ with tab12:
           <p style="font-size:1.12rem; line-height:1.65; color:#f1f5f9; margin-bottom:14px; font-weight:400;">
             "{spoken}"
           </p>
-          <button onclick="window.speechSynthesis.cancel(); let u = new SpeechSynthesisUtterance('{escaped_spoken}'); u.rate = 1.05; window.speechSynthesis.speak(u);"
+          <button id="mp-play-voice"
+                  onclick="window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance('{escaped_spoken}'); u.rate = 1.05; window.speechSynthesis.speak(u);"
                   style="background: #0284c7; color: #ffffff; border: none; padding: 8px 18px; border-radius: 8px;
                          font-weight: 600; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
             ▶️ Play Alexa Voice
           </button>
         </div>
-        """, unsafe_allow_html=True)
+        """, height=_box_h, scrolling=False)
 
         # ── 2. Multimodal Display Card (Echo Show / Fire TV Screen) ──
         card = res.get("display_card", {})
