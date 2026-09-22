@@ -2,14 +2,14 @@
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://hf-macro-dashboard.streamlit.app/)
 [![Google Cloud Run](https://img.shields.io/badge/Google%20Cloud%20Run-Live-4285F4?logo=google-cloud&logoColor=white)](https://macro-pulse-652787573242.us-central1.run.app)
-[![BigQuery](https://img.shields.io/badge/GCP%20BigQuery-Active-669DF6?logo=google-cloud&logoColor=white)](https://console.cloud.google.com/bigquery?project=agentichackathon-506620)
+[![AWS S3](https://img.shields.io/badge/AWS%20S3-Data%20Lake-569A31?logo=amazons3&logoColor=white)](https://aws.amazon.com/s3/)
 [![Daily Quant Signal](https://github.com/sechan9999/hf-macro-dashboard/actions/workflows/daily-quant-signal.yml/badge.svg)](https://github.com/sechan9999/hf-macro-dashboard/actions/workflows/daily-quant-signal.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 **Macro Pulse** is an institutional-grade financial intelligence and quantitative screening platform. It bridges the gap between retail technical indicators (simple 14-day RSI and moving averages) and hedge-fund macro risk management (credit spreads, yield-curve dynamics, regime-switching models, walk-forward strategy backtesting, and AI-driven macro commentary).
 
-Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, **Google BigQuery**, and **Google Gemini AI**, Macro Pulse integrates 13 specialized analytical modules into a unified, free, real-time web dashboard.
+Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, **AWS S3**, and **Google Gemini AI**, Macro Pulse integrates 13 specialized analytical modules into a unified, free, real-time web dashboard.
 
 ---
 
@@ -200,7 +200,7 @@ The complete documentation is also compiled in [`docs/methodology.md`](docs/meth
 
 | Layer | Technology |
 | :--- | :--- |
-| **Cloud Data Warehouse** | [Google BigQuery](https://cloud.google.com/bigquery) (Serverless partition tables & quant marts) |
+| **Cloud Data Lake** | [AWS S3](https://aws.amazon.com/s3/) (Parquet quant marts via boto3 + pyarrow) |
 | **Frontend UI** | [Streamlit](https://streamlit.io/) (Dark financial theme, custom CSS layout) |
 | **Data Visualization** | [Plotly](https://plotly.com/python/) (Interactive charts, dark theme presets) |
 | **Market Data** | [yfinance](https://pypi.org/project/yfinance/) (Live real-time prices & fundamentals) |
@@ -215,22 +215,23 @@ The complete documentation is also compiled in [`docs/methodology.md`](docs/meth
 
 ---
 
-## ☁️ Google Cloud BigQuery Quant Lakehouse
+## ☁️ AWS S3 Quant Data Lake
 
-Inspired by modern data engineering architectures (GCS + BigQuery + Cloud Run), Macro Pulse decouples live presentation from market data ingestion using **Google BigQuery**:
+Macro Pulse decouples live presentation from market-data ingestion using an **AWS S3 data lake**. The access pattern is write-whole-table / read-whole-table (no ad-hoc SQL), so each mart is a single Parquet object rather than a warehouse table:
 
-* **Project**: `agentichackathon-506620`
-* **Dataset**: `macropulse` (US Multi-region)
-* **Tables**:
-  * `macropulse.macro_factors`: Time-series partitioned daily by `date`, caching S&P 500, VIX, Treasury yields, credit spreads, and regime z-scores.
-  * `macropulse.quant_signals`: Pre-computed ATR%, 20d Realized Volatility, Bollinger Bandwidth, squeeze detection, and composite scores across the institutional watchlist.
+* **Bucket**: your own (set `MACROPULSE_S3_BUCKET`), prefix `macropulse/` (`MACROPULSE_S3_PREFIX`)
+* **Marts** (`src/aws_datalake.py`, written via `boto3` + `pyarrow`):
+  * `macropulse/macro_factors.parquet`: S&P 500, VIX, Treasury yields, credit spreads, and regime z-scores, keyed by `date`.
+  * `macropulse/quant_signals.parquet`: ATR%, 20d realized vol, Bollinger bandwidth, squeeze detection, and composite scores across the watchlist.
 
-### Running the BigQuery ETL Pipeline
-Populate or refresh the data warehouse marts directly from the command line:
+### Enabling the data lake
+It is optional: with nothing configured the app runs on live yfinance/local and the sidebar shows **AWS S3: Standby (local/fallback)**. To turn it on, set the bucket and give the app AWS credentials (env vars, a shared profile, or an instance/task role):
 ```bash
-python scripts/gcp_etl_pipeline.py --project agentichackathon-506620 --dataset macropulse
+export MACROPULSE_S3_BUCKET=your-bucket
+export AWS_REGION=us-east-1
+# AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY, or an attached role
 ```
-Inside the dashboard, users can click **"☁️ Load from BigQuery Mart (<0.2s)"** to fetch pre-computed quant signals instantaneously without waiting for sequential HTTP scraping.
+On Streamlit Cloud, put the same values in **App → Settings → Secrets**. Once connected, the marts are written on each live refresh, and **"☁️ Load from S3 Mart (<0.2s)"** reads pre-computed quant signals back instantly.
 
 
 ---

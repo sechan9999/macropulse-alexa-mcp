@@ -83,18 +83,18 @@ except Exception as _e:
     _import_errors["quant_signals"] = str(_e)
 
 try:
-    from src.bigquery_service import (
-        is_bigquery_available,
-        get_bq_status,
-        load_macro_from_bigquery,
-        save_macro_to_bigquery,
-        load_quant_signals_from_bigquery,
-        save_quant_signals_to_bigquery,
+    from src.aws_datalake import (
+        is_datalake_available,
+        get_datalake_status,
+        load_macro_from_datalake,
+        save_macro_to_datalake,
+        load_quant_signals_from_datalake,
+        save_quant_signals_to_datalake,
     )
-    _BQ_OK = is_bigquery_available()
+    _DL_OK = is_datalake_available()
 except Exception as _e:
-    _BQ_OK = False
-    _import_errors["bigquery"] = str(_e)
+    _DL_OK = False
+    _import_errors["aws_datalake"] = str(_e)
 
 # Personalized watchlists — same Firestore store the Alexa+ MCP server and
 # Fire TV app read/write, now surfaced in the dashboard itself.
@@ -335,10 +335,10 @@ def _try_load_fred_series(start_ts, end_ts):
 
 @st.cache_data(ttl=3600, show_spinner="📡 Fetching macro data…")
 def load_macro() -> pd.DataFrame:
-    """Pull S&P500, VIX, 10Y yield via BigQuery or yfinance fallback."""
-    if _BQ_OK:
+    """Pull S&P500, VIX, 10Y yield via AWS S3 or yfinance fallback."""
+    if _DL_OK:
         try:
-            bq_df = load_macro_from_bigquery()
+            bq_df = load_macro_from_datalake()
             if bq_df is not None and not bq_df.empty and len(bq_df) > 100:
                 if "regime" not in bq_df.columns or "regime_score" not in bq_df.columns:
                     cs = (bq_df["credit_spread"] - bq_df["credit_spread"].mean()) / bq_df["credit_spread"].std()
@@ -346,7 +346,7 @@ def load_macro() -> pd.DataFrame:
                     bq_df["regime_score"] = cs.fillna(0) + rv.fillna(0)
                     bq_df["regime"] = np.select([bq_df["regime_score"]<-0.5, bq_df["regime_score"]>0.5],
                                               ["Risk-On 🟢","Risk-Off 🔴"], default="Neutral 🟡")
-                bq_df["_data_source"] = "GCP BigQuery"
+                bq_df["_data_source"] = "AWS S3"
                 return bq_df.dropna(subset=["sp500"])
         except Exception:
             pass
@@ -409,9 +409,9 @@ def load_macro() -> pd.DataFrame:
     df["regime"] = np.select([df["regime_score"]<-0.5, df["regime_score"]>0.5],
                               ["Risk-On 🟢","Risk-Off 🔴"], default="Neutral 🟡")
     df["_data_source"] = "Live yfinance"
-    if _BQ_OK:
+    if _DL_OK:
         try:
-            save_macro_to_bigquery(df)
+            save_macro_to_datalake(df)
         except Exception:
             pass
     return df.dropna(subset=["sp500"])
@@ -668,19 +668,19 @@ with st.sidebar:
     mc_vol = st.slider("σ Annual (%)",     5, 40, 16)
     mc_n   = st.selectbox("Paths", [1000,5000,10000], index=1)
     st.markdown("---")
-    if _BQ_OK:
-        st.markdown("**☁️ GCP Data Lakehouse**")
-        bq_stat = get_bq_status()
+    if _DL_OK:
+        st.markdown("**☁️ AWS Data Lake (S3)**")
+        bq_stat = get_datalake_status()
         if bq_stat.get("connected"):
-            st.success(f"**BigQuery**: Connected\n\nProject: `{bq_stat['project']}`")
+            st.success(f"**S3**: Connected\n\nBucket: `{bq_stat['bucket']}`")
             if bq_stat.get("tables"):
                 st.caption(f"Active Marts: {', '.join(bq_stat['tables'])}")
         else:
-            st.caption("BigQuery: Standby (local/fallback)")
+            st.caption("AWS S3: Standby (local/fallback)")
         st.markdown("---")
     if st.button("🔄 Reload Data"):
         st.cache_data.clear(); st.rerun()
-    st.markdown("<small style='color:#475569'>Data: yfinance · FRED · BigQuery<br>© 2026 HF Research</small>",
+    st.markdown("<small style='color:#475569'>Data: yfinance · FRED · AWS S3<br>© 2026 HF Research</small>",
                 unsafe_allow_html=True)
 
 
@@ -2358,14 +2358,14 @@ with tab11:
         with col_btn1:
             run_qs = st.button("⚡ Run Live Quant Scan", type="primary", key="qs_run")
         with col_btn2:
-            load_bq = st.button("☁️ Load from BigQuery Mart (<0.2s)", key="qs_bq")
+            load_bq = st.button("☁️ Load from S3 Mart (<0.2s)", key="qs_bq")
 
         qs_df = pd.DataFrame()
         if run_qs:
             qs_df = _cached_quant_scan(qs_tickers, qs_period)
-            if _BQ_OK and not qs_df.empty:
+            if _DL_OK and not qs_df.empty:
                 try:
-                    save_quant_signals_to_bigquery(qs_df.rename(columns={
+                    save_quant_signals_to_datalake(qs_df.rename(columns={
                         "Ticker": "ticker", "Price": "price", "Signal": "signal",
                         "Score": "score", "Vol Regime": "vol_regime",
                         "Vol Breakout": "vol_breakout", "Reasons": "reasons",
@@ -2374,8 +2374,8 @@ with tab11:
                 except Exception:
                     pass
         elif load_bq:
-            if _BQ_OK:
-                bq_signals = load_quant_signals_from_bigquery()
+            if _DL_OK:
+                bq_signals = load_quant_signals_from_datalake()
                 if bq_signals is not None and not bq_signals.empty:
                     qs_df = bq_signals.rename(columns={
                         "ticker": "Ticker", "price": "Price", "signal": "Signal",
@@ -2383,11 +2383,11 @@ with tab11:
                         "vol_breakout": "Vol Breakout", "reasons": "Reasons",
                         "error_message": "_error"
                     })
-                    st.toast("⚡ Loaded instant quant mart from Google BigQuery!", icon="☁️")
+                    st.toast("⚡ Loaded instant quant mart from AWS S3!", icon="☁️")
                 else:
-                    st.warning("BigQuery quant mart empty. Click '⚡ Run Live Quant Scan' first.")
+                    st.warning("AWS S3 quant mart empty. Click '⚡ Run Live Quant Scan' first.")
             else:
-                st.info("BigQuery service not available in this environment.")
+                st.info("AWS S3 data lake not available in this environment.")
 
 
         if not qs_df.empty:
