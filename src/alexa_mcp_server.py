@@ -29,6 +29,7 @@ try:
 except Exception:
     pass
 import os
+import html
 import re
 import json
 import logging
@@ -70,7 +71,7 @@ except ImportError:
         _ToolError = RuntimeError
 
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse
 from starlette.routing import Mount
 from starlette.middleware.cors import CORSMiddleware
 
@@ -772,8 +773,54 @@ async def alexa_skill_webhook_endpoint(request):
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
+_LANDING_TOOLS = [
+    ("get_macro_regime", "Current macro regime (risk-on / risk-off) from live market data."),
+    ("get_rates_and_spreads", "Treasury yields, curve spreads and credit spreads."),
+    ("simulate_portfolio_risk", "Monte Carlo VaR / expected shortfall for a ticker."),
+    ("check_nvda_danger_zone", "NVDA block-trade danger-zone check."),
+    ("scan_quant_signals", "Breakout / squeeze / Bollinger signal scan."),
+    ("get_expected_returns", "Static reference estimate of expected returns (labelled as such)."),
+    ("simulate_fomc_shock", "Cross-asset PnL and VaR under FOMC rate-shock scenarios."),
+]
+
+_LANDING_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MacroPulse Alexa+ MCP Server</title>
+<style>
+:root{{--bg:#fff;--fg:#1a1f2b;--muted:#5b6475;--card:#f4f6fa;--line:#dde2ec;--accent:#0b6bcb}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#0f131b;--fg:#e8ecf3;--muted:#98a2b6;--card:#181e2a;--line:#2a3243;--accent:#6cb0ff}}}}
+body{{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}}
+main{{max-width:720px;margin:0 auto;padding:32px 16px}}
+h1{{font-size:1.6rem;margin:0 0 4px}} .sub{{color:var(--muted);margin:0 0 24px}}
+.ok{{display:inline-block;padding:2px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:.85rem}}
+h2{{font-size:1.05rem;margin:28px 0 8px}}
+code{{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:.92em;word-break:break-all}}
+.url{{display:block;padding:12px;margin:0}}
+ul{{list-style:none;padding:0;margin:0}} li{{padding:10px 0;border-bottom:1px solid var(--line)}}
+li span{{display:block;color:var(--muted);font-size:.92rem}}
+a{{color:var(--accent)}} footer{{margin-top:28px;color:var(--muted);font-size:.85rem}}
+</style></head><body><main>
+<h1>MacroPulse Alexa+ MCP Server</h1>
+<p class="sub">Live macro-regime, rates, portfolio-risk and FOMC-shock tools for voice assistants and MCP clients. <span class="ok">status: ok</span></p>
+<h2>MCP endpoint (Streamable HTTP)</h2>
+<code class="url">{mcp_url}</code>
+<h2>Tools</h2>
+<ul>{tools}</ul>
+<footer>Market data comes from public sources and is never fabricated: when it is unavailable the tools say so instead of guessing.
+Informational only, not investment advice. &middot; <a href="/health">/health</a></footer>
+</main></body></html>"""
+
+
 async def root_endpoint(request):
-    """Landing response for a browser opening the bare service URL."""
+    """Landing page for a browser opening the bare service URL; JSON for API clients."""
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept:
+        base = f"{request.headers.get('x-forwarded-proto', request.url.scheme)}://{request.headers.get('host', request.url.netloc)}"
+        tools = "".join(
+            f"<li><code>{html.escape(n)}</code><span>{html.escape(d)}</span></li>"
+            for n, d in _LANDING_TOOLS)
+        return HTMLResponse(_LANDING_HTML.format(mcp_url=html.escape(base + "/mcp"), tools=tools))
     return JSONResponse({
         "service": "MacroPulse Alexa+ MCP Server",
         "status": "ok",

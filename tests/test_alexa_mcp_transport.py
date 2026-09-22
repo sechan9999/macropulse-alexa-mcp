@@ -112,6 +112,15 @@ class TestMcpTransports(unittest.TestCase):
     def test_base_url_shows_a_landing_page_for_browsers(self):
         status, data = self._http("GET", "/", headers={"Accept": "text/html"})
         self.assertEqual(status, 200)
+        page = data.decode() if isinstance(data, bytes) else data
+        self.assertIn("<title>MacroPulse Alexa+ MCP Server</title>", page)
+        self.assertIn(f"127.0.0.1:{self.port}/mcp", page)
+        for tool in ("get_macro_regime", "simulate_fomc_shock", "scan_quant_signals"):
+            self.assertIn(tool, page)
+
+    def test_base_url_stays_json_for_api_clients(self):
+        status, data = self._http("GET", "/", headers={"Accept": "application/json"})
+        self.assertEqual(status, 200)
         self.assertEqual(json.loads(data)["mcp_endpoint"], "/mcp")
 
     def test_mcp_also_works_at_the_base_url(self):
