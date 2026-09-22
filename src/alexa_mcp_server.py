@@ -783,33 +783,98 @@ _LANDING_TOOLS = [
     ("simulate_fomc_shock", "Cross-asset PnL and VaR under FOMC rate-shock scenarios."),
 ]
 
-_LANDING_HTML = """<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MacroPulse Alexa+ MCP Server</title>
-<style>
-:root{{--bg:#fff;--fg:#1a1f2b;--muted:#5b6475;--card:#f4f6fa;--line:#dde2ec;--accent:#0b6bcb}}
-@media (prefers-color-scheme:dark){{:root{{--bg:#0f131b;--fg:#e8ecf3;--muted:#98a2b6;--card:#181e2a;--line:#2a3243;--accent:#6cb0ff}}}}
-body{{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}}
-main{{max-width:720px;margin:0 auto;padding:32px 16px}}
-h1{{font-size:1.6rem;margin:0 0 4px}} .sub{{color:var(--muted);margin:0 0 24px}}
-.ok{{display:inline-block;padding:2px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:.85rem}}
-h2{{font-size:1.05rem;margin:28px 0 8px}}
-code{{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:.92em;word-break:break-all}}
-.url{{display:block;padding:12px;margin:0}}
-ul{{list-style:none;padding:0;margin:0}} li{{padding:10px 0;border-bottom:1px solid var(--line)}}
-li span{{display:block;color:var(--muted);font-size:.92rem}}
-a{{color:var(--accent)}} footer{{margin-top:28px;color:var(--muted);font-size:.85rem}}
-</style></head><body><main>
-<h1>MacroPulse Alexa+ MCP Server</h1>
+_PAGE_CSS = """
+:root{--bg:#fff;--fg:#1a1f2b;--muted:#5b6475;--card:#f4f6fa;--line:#dde2ec;--accent:#0b6bcb}
+@media (prefers-color-scheme:dark){:root{--bg:#0f131b;--fg:#e8ecf3;--muted:#98a2b6;--card:#181e2a;--line:#2a3243;--accent:#6cb0ff}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:32px 16px}
+h1{font-size:1.6rem;margin:0 0 4px} .sub{color:var(--muted);margin:0 0 24px}
+.ok{display:inline-block;padding:2px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:.85rem}
+h2{font-size:1.05rem;margin:28px 0 8px}
+code{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:.92em;word-break:break-all}
+.url{display:block;padding:12px;margin:0}
+ul{padding-left:1.2rem} ul.tools{list-style:none;padding:0;margin:0} ul.tools li{padding:10px 0;border-bottom:1px solid var(--line)}
+ul.tools li span{display:block;color:var(--muted);font-size:.92rem}
+a{color:var(--accent)} footer{margin-top:28px;color:var(--muted);font-size:.85rem}
+"""
+
+_CONTACT_URL = "https://github.com/sechan9999/macropulse-alexa-mcp/issues"
+_POLICY_UPDATED = "September 21, 2026"
+
+
+def _page(title: str, body: str) -> str:
+    """Shared shell for the landing, privacy and terms pages (static markup only)."""
+    return (
+        '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+        f"<title>{html.escape(title)}</title>\n<style>{_PAGE_CSS}</style></head><body><main>\n"
+        f"{body}\n"
+        '<footer><a href="/">Home</a> &middot; <a href="/privacy">Privacy Policy</a> &middot; '
+        '<a href="/terms">Terms of Use</a> &middot; <a href="/health">/health</a></footer>\n'
+        "</main></body></html>"
+    )
+
+
+_PRIVACY_BODY = f"""<h1>Privacy Policy</h1>
+<p class="sub">MacroPulse Alexa+ MCP Server &middot; last updated {_POLICY_UPDATED}</p>
+<h2>What this service is</h2>
+<p>MacroPulse is a read-only information service. It answers questions about market conditions
+(macro regime, rates and spreads, portfolio risk simulations, FOMC scenarios) when an assistant such as Alexa+
+calls its tools. It has no user accounts and no sign-in.</p>
+<h2>What we receive</h2>
+<ul>
+<li>The tool request itself: the tool name and its arguments, for example a ticker symbol such as <code>SPY</code> or a scenario name.</li>
+<li>Standard connection data that any web server sees, such as the IP address of the caller and the request time.</li>
+</ul>
+<p>We do not ask for, and the tools do not need, your name, email address, phone number, location, payment
+details or any other personal information. Please do not include personal information in your requests.</p>
+<h2>What we do with it</h2>
+<ul>
+<li>Requests are used only to compute the answer and return it to the caller.</li>
+<li>Ticker symbols are sent to a public market-data provider (Yahoo Finance) to fetch prices. Nothing else from your request is sent to it.</li>
+<li>Operational logs (errors, timing, request lines) are kept in the hosting provider logging service for troubleshooting and to keep the service reliable.</li>
+<li>We do not sell your data, use it for advertising, or build profiles of users.</li>
+</ul>
+<h2>Where it runs</h2>
+<p>The service is hosted on Amazon Web Services in the United States (us-east-1). Voice handling by Alexa is
+governed by the Amazon privacy notice; this service only sees the resulting tool request.</p>
+<h2>Children</h2>
+<p>The service is not directed at children under 13 and does not knowingly collect information from them.</p>
+<h2>Changes and contact</h2>
+<p>We may update this policy; the date above shows the latest version. Questions or requests about data:
+<a href="{_CONTACT_URL}">{_CONTACT_URL}</a>.</p>"""
+
+_TERMS_BODY = f"""<h1>Terms of Use</h1>
+<p class="sub">MacroPulse Alexa+ MCP Server &middot; last updated {_POLICY_UPDATED}</p>
+<h2>Informational use only</h2>
+<p>The service provides general market information and simulations. It is <strong>not investment, financial,
+tax or legal advice</strong> and is not a recommendation to buy or sell any security. Simulations (for example
+VaR or FOMC shock scenarios) rest on models and historical data and can be wrong. The expected-return tool
+returns a static reference estimate, not a forecast. Make your own decisions or consult a licensed professional.</p>
+<h2>Data and availability</h2>
+<ul>
+<li>Market data comes from third-party public sources and may be delayed, incomplete or unavailable. When live data cannot be fetched, the tools say so instead of guessing.</li>
+<li>The service is provided as is and as available, with no guarantee of uptime, accuracy or fitness for a particular purpose.</li>
+<li>Access may be changed, rate-limited or discontinued at any time.</li>
+</ul>
+<h2>Acceptable use</h2>
+<p>Do not attempt to disrupt the service, overload it with automated traffic, probe it for vulnerabilities
+without permission, or use it to break the law or the terms of the data providers behind it.</p>
+<h2>Liability</h2>
+<p>To the fullest extent permitted by law, the operator is not liable for losses arising from use of, or
+inability to use, the service or from decisions made on its output.</p>
+<h2>Changes and contact</h2>
+<p>We may update these terms; continued use after an update means you accept them. Questions:
+<a href="{_CONTACT_URL}">{_CONTACT_URL}</a>. See also the <a href="/privacy">Privacy Policy</a>.</p>"""
+
+_LANDING_BODY = """<h1>MacroPulse Alexa+ MCP Server</h1>
 <p class="sub">Live macro-regime, rates, portfolio-risk and FOMC-shock tools for voice assistants and MCP clients. <span class="ok">status: ok</span></p>
 <h2>MCP endpoint (Streamable HTTP)</h2>
 <code class="url">{mcp_url}</code>
 <h2>Tools</h2>
-<ul>{tools}</ul>
-<footer>Market data comes from public sources and is never fabricated: when it is unavailable the tools say so instead of guessing.
-Informational only, not investment advice. &middot; <a href="/health">/health</a></footer>
-</main></body></html>"""
+<ul class="tools">{tools}</ul>
+<p style="color:var(--muted);font-size:.85rem">Market data comes from public sources and is never fabricated: when it is unavailable the tools say so instead of guessing.
+Informational only, not investment advice.</p>"""
 
 
 async def root_endpoint(request):
@@ -820,7 +885,8 @@ async def root_endpoint(request):
         tools = "".join(
             f"<li><code>{html.escape(n)}</code><span>{html.escape(d)}</span></li>"
             for n, d in _LANDING_TOOLS)
-        return HTMLResponse(_LANDING_HTML.format(mcp_url=html.escape(base + "/mcp"), tools=tools))
+        body = _LANDING_BODY.format(mcp_url=html.escape(base + "/mcp"), tools=tools)
+        return HTMLResponse(_page("MacroPulse Alexa+ MCP Server", body))
     return JSONResponse({
         "service": "MacroPulse Alexa+ MCP Server",
         "status": "ok",
@@ -828,6 +894,14 @@ async def root_endpoint(request):
         "note": "MCP Streamable HTTP is served at /mcp and also at this base URL.",
         "health": "/health",
     })
+
+
+async def privacy_endpoint(request):
+    return HTMLResponse(_page("Privacy Policy - MacroPulse Alexa+ MCP Server", _PRIVACY_BODY))
+
+
+async def terms_endpoint(request):
+    return HTMLResponse(_page("Terms of Use - MacroPulse Alexa+ MCP Server", _TERMS_BODY))
 
 
 class _RootMcpAlias:
@@ -865,6 +939,8 @@ def build_starlette_app(warm_up: bool = True) -> Starlette:
     fastmcp_server.custom_route("/alexa/query", methods=["POST"])(alexa_query_endpoint)
     fastmcp_server.custom_route("/alexa/skill", methods=["POST"])(alexa_skill_webhook_endpoint)
     fastmcp_server.custom_route("/", methods=["GET"])(root_endpoint)
+    fastmcp_server.custom_route("/privacy", methods=["GET"])(privacy_endpoint)
+    fastmcp_server.custom_route("/terms", methods=["GET"])(terms_endpoint)
 
     if _MCP_V2:
         # Stateless: every tool is a pure function, so no per-session state is needed and

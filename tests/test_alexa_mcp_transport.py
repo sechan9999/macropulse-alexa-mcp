@@ -11,6 +11,7 @@ Runs against both mcp 1.x and mcp>=2.
 import asyncio
 import http.client
 import json
+import re
 import socket
 import threading
 import time
@@ -117,6 +118,17 @@ class TestMcpTransports(unittest.TestCase):
         self.assertIn(f"127.0.0.1:{self.port}/mcp", page)
         for tool in ("get_macro_regime", "simulate_fomc_shock", "scan_quant_signals"):
             self.assertIn(tool, page)
+
+    def test_privacy_and_terms_pages(self):
+        for path, marker in (("/privacy", "Privacy Policy"), ("/terms", "Terms of Use")):
+            status, data = self._http("GET", path)
+            self.assertEqual(status, 200, path)
+            page = data.decode() if isinstance(data, bytes) else data
+            self.assertIn(f"<h1>{marker}</h1>", page)
+            self.assertIn('href="/privacy"', page)
+            self.assertIn('href="/terms"', page)
+            self.assertNotIn("mailto:", page)  # no email address is published
+            self.assertIsNone(re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", page))
 
     def test_base_url_stays_json_for_api_clients(self):
         status, data = self._http("GET", "/", headers={"Accept": "application/json"})
