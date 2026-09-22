@@ -1,0 +1,50 @@
+{
+  "manifestVersion": "1.0",
+  "storeListing": {
+    "distributionCountries": ["US"],
+    "locales": {
+      "en-US": {
+        "name": { "value": "MacroPulse" },
+        "shortDescription": "Live macro regime, rates and spreads, portfolio risk and FOMC rate-shock checks, spoken to you.",
+        "fullDescription": "MacroPulse turns live market data into short spoken briefings for anyone who follows the economy.\n\nAsk for the current macro regime (risk-on, neutral or risk-off) and the stress reading behind it. Get the latest 10-year yield, the 10-year minus 3-month curve slope and a credit-stress proxy. Run a Monte Carlo value-at-risk and expected-shortfall estimate for a ticker such as SPY or NVDA. Stress a sample 60/40 portfolio against FOMC scenarios like a 50 basis point hawkish surprise or a liquidity crunch. Scan a ticker for volatility squeeze and breakout signals, or check whether NVDA is in its danger zone.\n\nMarket data comes from public sources and is never made up: if live data cannot be fetched, MacroPulse says so instead of guessing. The expected-return answer is a static reference estimate and is labelled that way.\n\nMacroPulse is informational only. It is not investment, financial, tax or legal advice, and simulations rest on models and historical data that can be wrong. No account or sign-in is needed, and it does not ask for personal information.",
+        "examplePhrases": [
+          "Alexa, ask MacroPulse what the macro regime is.",
+          "Alexa, ask MacroPulse to simulate a hawkish Fed shock.",
+          "Alexa, ask MacroPulse how risky SPY is right now."
+        ],
+        "privacyAndCompliance": {
+          "privacyPolicyUrl": "https://ma-76bae7709d4340b3ab4733ba644f11e4.ecs.us-east-1.on.aws/privacy",
+          "termsOfUseUrl": "https://ma-76bae7709d4340b3ab4733ba644f11e4.ecs.us-east-1.on.aws/terms"
+        }
+      }
+    }
+  },
+  "mediaAssets": {
+    "icons": {
+      "light": {
+        "72x72": "https://raw.githubusercontent.com/sechan9999/macropulse-alexa-mcp/main/addon-package/assets/icon-72.png",
+        "64x64": "https://raw.githubusercontent.com/sechan9999/macropulse-alexa-mcp/main/addon-package/assets/icon-64.png",
+        "88x88": "https://raw.githubusercontent.com/sechan9999/macropulse-alexa-mcp/main/addon-package/assets/icon-88.png",
+        "126x126": "https://raw.githubusercontent.com/sechan9999/macropulse-alexa-mcp/main/addon-package/assets/icon-126.png",
+        "180x180": "https://raw.githubusercontent.com/sechan9999/macropulse-alexa-mcp/main/addon-package/assets/icon-180.png",
+        "241x241": "https://raw.githubusercontent.com/sechan9999/macropulse-alexa-mcp/main/addon-package/assets/icon-241.png"
+      }
+    },
+    "carouselImages": [
+      "https://raw.githubusercontent.com/sechan9999/macropulse-alexa-mcp/main/addon-package/assets/carousel-1.png"
+    ]
+  },
+  "integrations": [
+    {
+      "type": "MCP",
+      "config": {
+        "endpoints": {
+          "default": {
+            "type": "HTTPS",
+            "uri": "https://ma-76bae7709d4340b3ab4733ba644f11e4.ecs.us-east-1.on.aws/mcp"
+          }
+        }
+      }
+    }
+  ]
+}
