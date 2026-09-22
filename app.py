@@ -785,7 +785,7 @@ st.markdown("---")
 # ══════════════════════════════════════════
 tab1,tab2,tab3,tab4,tab5,tab6,tab7,tab8,tab9,tab10,tab11,tab12,tab13 = st.tabs([
     "📈 Performance","🌍 Macro & Rates","🔍 Regime","🤖 Expected Returns",
-    "📊 Screener","📉 Technical","🎲 Risk Sim","✨ Gemini AI Analyst",
+    "📊 Screener","📉 Technical","🎲 Risk Sim","✨ AI Analyst",
     "🔥 NVDA Danger Zone","📊 Strategy Backtest","🎯 Quant Signals","🎙️ Alexa+ Copilot",
     "🏦 Multi-Asset Sync & FOMC Shock"])
 
@@ -1437,7 +1437,7 @@ with tab7:
         st.markdown("#### 📋 Simulation Statistics")
         st.dataframe(sim_stats, use_container_width=True, hide_index=True)
 
-# ─── Tab 8: Gemini AI Analyst ────────────────────────────────────────
+# ─── Tab 8: AI Analyst ────────────────────────────────────────
 # Uses Frontier Unified GenAI SDK — Gemini 3 Flash Preview (2026 Fleet)
 def _get_gemini_key():
     try:
