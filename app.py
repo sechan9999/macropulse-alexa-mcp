@@ -1,4 +1,4 @@
-import os, sys, warnings, traceback
+import os, sys, json, warnings, traceback
 warnings.filterwarnings("ignore")
 
 # ── 안전한 import - 실패해도 앱이 죽지 않도록 ─────────────────────────
