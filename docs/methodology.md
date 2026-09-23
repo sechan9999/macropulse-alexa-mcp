@@ -433,3 +433,45 @@ $$\text{score}_t = \text{clip}\Bigl(\textstyle\sum_k w_k \cdot \mathbf{1}[\text{
 * **Conviction dampening** — reducing a score's magnitude (not flipping its sign) when the regime is noisy enough that the same signal is less trustworthy.
 * **Advisory signal** — a recommendation and its reasoning, with no order sizing, routing, or execution attached.
 
+
+
+---
+
+## 📑 Equity Report — Methodology
+
+### How to read the charts
+
+* **KPI tiles** — last price, probability-weighted DCF value, base-case DCF, rule-based rating, WACC and the daily pattern screen.
+* **Macro regime overlay** — the dashboard's Risk-On / Neutral / Risk-Off call re-weights the bear/base/bull scenarios and nudges the equity risk premium. The note shows what the value would be with neutral 25/50/25 weights.
+* **Valuation range (football field)** — 52-week range, historical P/E and P/B bands, DCF sensitivity and scenario range against the dotted last-price line.
+* **Sensitivity grid** — value per share for WACC ±1pp × terminal growth ±1pp; blue cells sit above the price, orange below.
+* **Technical charts** — Monthly (3y), Weekly (12m), Daily (6m) candles with moving averages, support/resistance, pattern markers (▲ bullish / ▼ bearish), MACD and slow stochastic (KD) panels.
+* **Downloads** — Excel model with live formulas (edit the yellow cells), Word research note, offline HTML dashboard, or everything as a zip.
+
+### Mathematical formulation
+
+**Free cash flow (FCFF proxy) and projection**
+$$\text{FCF}_t = \text{Revenue}_t \times m, \qquad g_t = g_1 + (g_\infty - g_1)\frac{t-1}{N-1}$$
+
+**Discount rate (CAPM + after-tax debt)**
+$$k_e = r_f + \beta\,(\text{ERP} + \Delta_{\text{regime}}), \qquad \text{WACC} = \tfrac{E}{D+E}k_e + \tfrac{D}{D+E}k_d(1-\tau)$$
+
+**Enterprise and equity value**
+$$\text{EV} = \sum_{t=1}^{N}\frac{\text{FCF}_t}{(1+\text{WACC})^t} + \frac{\text{FCF}_N(1+g_\infty)}{(\text{WACC}-g_\infty)(1+\text{WACC})^N}, \qquad V/\text{share} = \frac{\text{EV} - \text{net debt}}{\text{shares}}$$
+
+**Regime-weighted expected value**
+$$\mathbb{E}[V] = \sum_{s\in\{\text{bear},\text{base},\text{bull}\}} p_s(\text{regime})\, V_s$$
+Risk-On 20/50/30 (ERP −0.25pp) · Neutral 25/50/25 · Risk-Off 40/45/15 (ERP +0.50pp).
+
+**Blume-adjusted beta** (2y weekly returns vs S&P 500): $\beta_{adj} = 0.67\,\beta_{raw} + 0.33$
+
+**6-month touch probability** (driftless log-normal, reflection principle)
+$$P(\text{touch } K) = 2\left[1 - \Phi\!\left(\frac{|\ln(K/S)|}{\sigma\sqrt{T}}\right)\right]$$
+
+### Hedge-fund terminology
+
+* **FCFF proxy** — cash from operations minus capital expenditures from SEC 10-K XBRL filings; simpler than EBIT(1−t)+D&A−CapEx−ΔNWC and fully traceable to the filing.
+* **Terminal value share** — when the Gordon terminal value is >80% of EV, the valuation is mostly a bet on WACC and $g_\infty$.
+* **Football field** — side-by-side valuation ranges from different methods; agreement between methods matters more than any single point.
+* **Chaikin Money Flow / OBV** — price-volume proxies for accumulation. The US has no daily institutional net-buy tape like Korea's KRX, so ownership (13F) and short interest are shown as periodic snapshots.
+* **Rule-based rating** — a transparent score from valuation, multi-timeframe trend, pattern screen and money flow. The optional LLM narrative may only quote numbers from that JSON.

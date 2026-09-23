@@ -31,6 +31,8 @@ from src.alexa_mcp_server import (
     execute_scan_quant_signals,
     execute_get_expected_returns,
     execute_ask_macro_analyst,
+    execute_get_equity_report,
+    EquityReportUnsupported,
     MarketDataUnavailable,
 )
 from src.brokerage_sync import BrokeragePortfolio
@@ -52,6 +54,35 @@ class AlexaMacroSkill:
         "returns": ["expected return", "forecast", "ridge", "projection", "forward return"]
     }
 
+    EQUITY_KEYWORDS = ("equity report", "stock report", "research report", "research note", "report on",
+                       "report for", "fair value", "valuation", "dcf", "price target", "intrinsic value")
+    # Spoken company names -> tickers (voice users say "Apple", not "AAPL").
+    COMPANY_ALIASES = {
+        "apple": "AAPL", "microsoft": "MSFT", "nvidia": "NVDA", "amazon": "AMZN", "alphabet": "GOOGL",
+        "google": "GOOGL", "meta": "META", "facebook": "META", "tesla": "TSLA", "netflix": "NFLX",
+        "broadcom": "AVGO", "costco": "COST", "eli lilly": "LLY", "lilly": "LLY", "visa": "V",
+        "mastercard": "MA", "jpmorgan": "JPM", "jp morgan": "JPM", "walmart": "WMT", "home depot": "HD",
+        "coca cola": "KO", "coca-cola": "KO", "exxon": "XOM", "chevron": "CVX", "unitedhealth": "UNH",
+        "johnson and johnson": "JNJ", "procter and gamble": "PG", "salesforce": "CRM", "adobe": "ADBE",
+        "oracle": "ORCL", "intel": "INTC", "amd": "AMD", "micron": "MU", "berkshire": "BRK-B",
+    }
+    _TICKER_AFTER = re.compile(r"\b(?:on|for|of|about)\s+(?:the\s+)?\$?([a-z]{1,5}(?:[.-][a-z])?)\b", re.I)
+    _NOT_TICKERS = {"the", "my", "a", "an", "me", "it", "this", "that", "tv", "stock", "shares", "today"}
+
+    @classmethod
+    def extract_equity_ticker(cls, prompt: str) -> Optional[str]:
+        p = prompt.lower()
+        for name in sorted(cls.COMPANY_ALIASES, key=len, reverse=True):
+            if re.search(rf"\b{re.escape(name)}\b", p):
+                return cls.COMPANY_ALIASES[name]
+        for m in cls._TICKER_AFTER.finditer(prompt):
+            tok = m.group(1)
+            if tok.lower() not in cls._NOT_TICKERS:
+                return tok.upper().replace(".", "-")
+        caps = re.findall(r"\b[A-Z]{2,5}\b", prompt)
+        caps = [c for c in caps if c not in {"DCF", "TV", "ETF", "MACRO"}]
+        return caps[0] if caps else None
+
     @classmethod
     def identify_intent(cls, prompt: str) -> Tuple[str, Dict[str, Any]]:
         """Identifies target tool and extracts arguments from user voice or text prompt."""
@@ -69,6 +100,11 @@ class AlexaMacroSkill:
             if re.search(rf"\b{t.lower()}\b", p_low):
                 found_ticker = t
                 break
+
+        # Equity report (checked first: "show the Apple report on the TV" is still an equity report)
+        if any(k in p_low for k in cls.EQUITY_KEYWORDS):
+            args["ticker"] = cls.extract_equity_ticker(prompt) or "AAPL"
+            return "get_equity_report", args
 
         # Check explicit TV routing keywords
         if is_tv_request:
@@ -129,7 +165,8 @@ class AlexaMacroSkill:
         subtitle: str,
         sentiment: str,
         badges: List[Dict[str, str]],
-        speech_text: str
+        speech_text: str,
+        footer: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generates an Alexa Presentation Language (APL) 2024.1 document
@@ -219,7 +256,13 @@ class AlexaMacroSkill:
                             for b in badges[:4]
                         ]
                     }
-                ]
+                ] + ([{
+                    "type": "Text",
+                    "text": footer,
+                    "color": "#cbd5e1",
+                    "fontSize": "22dp",
+                    "paddingTop": "28dp"
+                }] if footer else [])
             }
         ]
 
@@ -238,6 +281,18 @@ class AlexaMacroSkill:
         honest spoken error card (status "error"), never an answer from made-up numbers."""
         try:
             return cls._execute(prompt)
+        except EquityReportUnsupported as e:
+            speech = ("I can only build equity reports for US companies that file 10-K reports with the SEC. "
+                      f"{str(e).split(':')[0]} isn't one of them, so I won't guess.")
+            card = {"title": "Equity report not available", "subtitle": str(e)[:120], "badges": [], "sentiment": "neutral"}
+            return {
+                "status": "error", "prompt": prompt, "is_tv_request": False, "tool_selected": "get_equity_report",
+                "tool_args": {}, "spoken_response": speech, "display_card": card,
+                "apl_document": cls.generate_apl_document(title=card["title"], subtitle=card["subtitle"],
+                                                          sentiment="neutral", badges=[], speech_text=speech),
+                "raw_payload": {"status": "error", "error": "unsupported_ticker", "message": str(e)},
+                "latency_ms": 0, "timestamp": datetime.now().isoformat(),
+            }
         except MarketDataUnavailable as e:
             logging.getLogger("MacroPulse-AlexaSkill").warning("Market data unavailable: %s", e)
             speech = "I can't reach live market data right now, so I won't guess. Please try again in a minute."
@@ -264,8 +319,30 @@ class AlexaMacroSkill:
         tool_name, args = cls.identify_intent(prompt)
         start_time = datetime.now()
         is_tv = args.get("is_tv_request", False)
+        footer = None
 
-        if tool_name == "get_macro_regime":
+        if tool_name == "get_equity_report":
+            raw = execute_get_equity_report(args.get("ticker", "AAPL"))
+            up, rating, rg = raw["upside_prob_weighted"], raw["rating"], raw["macro_regime"]
+            sc = raw["scenarios"]
+            card = {
+                "title": f"{raw['ticker']} Equity Report: {rating}",
+                "subtitle": f"Fair value ${raw['fair_value_prob_weighted']:,.0f} ({up * 100:+.0f}%) · {rg['regime']} weights",
+                "badges": [
+                    {"label": "Price", "value": f"${raw['price']:,.2f}"},
+                    {"label": "Fair Value", "value": f"${raw['fair_value_prob_weighted']:,.0f}"},
+                    {"label": "Upside", "value": f"{up * 100:+.1f}%"},
+                    {"label": "Weekly Trend", "value": raw["weekly_trend"].upper()},
+                ],
+                "sentiment": "bullish" if rating in ("Buy", "Overweight") else
+                             ("bearish" if rating in ("Sell", "Underweight") else "neutral"),
+            }
+            footer = (f"Bear ${sc['Bear']['per_share']:,.0f} ({sc['Bear']['prob']:.0%}) · "
+                      f"Base ${sc['Base']['per_share']:,.0f} ({sc['Base']['prob']:.0%}) · "
+                      f"Bull ${sc['Bull']['per_share']:,.0f} ({sc['Bull']['prob']:.0%}) · "
+                      f"Stop ${raw['levels']['stop']:,.0f} · Target ${raw['levels']['target1']:,.0f}")
+
+        elif tool_name == "get_macro_regime":
             raw = execute_get_macro_regime()
             card = {
                 "title": f"Macro Regime: {raw['regime']}",
@@ -391,7 +468,8 @@ class AlexaMacroSkill:
             subtitle=card["subtitle"],
             sentiment=card.get("sentiment", "neutral"),
             badges=card.get("badges", []),
-            speech_text=spoken_text
+            speech_text=spoken_text,
+            footer=footer,
         )
 
         return {
@@ -417,7 +495,8 @@ class AlexaMacroSkill:
         req_type = request_body.get("request", {}).get("type", "LaunchRequest")
         
         if req_type == "LaunchRequest":
-            speech = "Welcome to MacroPulse. You can ask for today's market regime, or say show the NVDA Danger Zone on the TV."
+            speech = ("Welcome to MacroPulse. You can ask for today's market regime, say show the NVDA Danger Zone "
+                      "on the TV, or ask for an equity report on a stock like Apple.")
             return {
                 "version": "1.0",
                 "response": {
@@ -461,6 +540,9 @@ class AlexaMacroSkill:
                 prompt = f"Alexa, run FOMC {scenario_slot} shock test"
             elif intent_name == "NvdaDangerZoneIntent":
                 prompt = "Alexa, check if Nvidia is in the Danger Zone"
+            elif intent_name == "EquityReportIntent":
+                ticker_slot = intent.get("slots", {}).get("Ticker", {}).get("value", "AAPL")
+                prompt = f"Alexa, give me an equity report on {ticker_slot}"
             elif intent_name == "QuantSignalIntent":
                 ticker_slot = intent.get("slots", {}).get("Ticker", {}).get("value", "SPY")
                 prompt = f"Alexa, scan quant signals on {ticker_slot}"

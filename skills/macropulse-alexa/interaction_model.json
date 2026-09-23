@@ -95,6 +95,24 @@
             "what is the quant conviction score on {Ticker}",
             "check volatility breakout on {Ticker}"
           ]
+        },
+        {
+          "name": "EquityReportIntent",
+          "slots": [
+            {
+              "name": "Ticker",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "give me an equity report on {Ticker}",
+            "give me a report on {Ticker}",
+            "run a report on {Ticker}",
+            "what is the fair value of {Ticker}",
+            "run a DCF on {Ticker}",
+            "show the {Ticker} report on the TV",
+            "what is the price target for {Ticker}"
+          ]
         }
       ],
       "types": [

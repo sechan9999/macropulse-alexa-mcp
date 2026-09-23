@@ -9,7 +9,7 @@
 
 **Macro Pulse** is an institutional-grade financial intelligence and quantitative screening platform. It bridges the gap between retail technical indicators (simple 14-day RSI and moving averages) and hedge-fund macro risk management (credit spreads, yield-curve dynamics, regime-switching models, walk-forward strategy backtesting, and AI-driven macro commentary).
 
-Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, **AWS S3**, and **Google Gemini AI**, Macro Pulse integrates 13 specialized analytical modules into a unified, free, real-time web dashboard.
+Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, **AWS S3**, and **Google Gemini AI**, Macro Pulse integrates 14 specialized analytical modules into a unified, free, real-time web dashboard.
 
 ---
 
@@ -22,9 +22,9 @@ Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, 
 
 ---
 
-## 🎯 13 Analytical Modules
+## 🎯 14 Analytical Modules
 
-The platform is structured into 13 dedicated analytical tabs, each equipped with its own **"How to Read · Math · HF Terms"** institutional methodology expander:
+The platform is structured into 14 dedicated analytical tabs, each equipped with its own **"How to Read · Math · HF Terms"** institutional methodology expander:
 
 ### 1. 📈 Performance & Benchmark Tear Sheet
 * **Cumulative Return (Base = 100)**: Strategy and S&P 500 total return tracked against the SPY ETF benchmark.
@@ -108,6 +108,16 @@ The platform is structured into 13 dedicated analytical tabs, each equipped with
   * *March 2020 Liquidity Crunch*: Correlated liquidation test across all risk assets.
 * **Fire TV Big Screen View**: High-contrast, large typography 10-foot UI designed for viewing on living room and trading desk wall displays.
 * **Personalized Ambient Audio Chimes**: Procedural harmonic audio cues played on Fire TV / browser when Bollinger Squeeze breakouts, credit spread divergences, or FOMC shocks occur.
+
+### 14. 📑 Equity Report (ticker in, research pack out)
+* **Four downloads per ticker**: Excel DCF model with live formulas (edit the yellow assumption cells and everything recalculates), Word research note, offline HTML DCF dashboard, or all of it as a zip. Files are built in memory, nothing is written to disk.
+* **Data**: prices from Yahoo Finance, fundamentals from **SEC EDGAR XBRL 10-K** filings (restatements win, multi-class share counts summed, no look-ahead in the P/E band). ETFs and foreign 20-F/40-F filers (e.g. TSM, ASML) are refused with a clear message instead of a currency-mismatched DCF.
+* **Valuation**: FCFF-proxy DCF (CFO − CapEx), CAPM with live 10Y yield and Blume-adjusted beta, WACC × g sensitivity, bear/base/bull scenarios, P/E and P/B bands, football-field chart.
+* **Macro-regime overlay**: the dashboard's Risk-On / Neutral / Risk-Off call sets the scenario weights (20/50/30 · 25/50/25 · 40/45/15) and shifts the ERP (−0.25pp / 0 / +0.50pp). The report also shows the neutral-weight value for comparison.
+* **Technicals**: Monthly (3y) / Weekly (12m) / Daily (6m) candles with MACD, slow stochastic (KD), RSI, Bollinger, ADX, support/resistance and a 17-pattern candlestick + indicator screen (`bullish_count`, `bearish_count`, `bull_score`, `bear_score`, `overall`).
+* **Narrative**: rule-based rating first, then optional Gemini / Bedrock text that may only quote numbers from the JSON context.
+* **Alexa+**: "Alexa, give me an equity report on Apple" → spoken summary + Fire TV APL card (scenario footer); new MCP tool `get_equity_report`; the Alexa+ tab shows the same four downloads. Deep link: `?ticker=AAPL`.
+* **Secrets**: set `SEC_USER_AGENT="Your Name you@example.com"` (SEC fair-access policy). Optional: `EQUITY_REPORT_WARM` (tickers prefetched by the MCP server, default `AAPL,MSFT,NVDA,AMZN,GOOGL`).
 
 ---
 
