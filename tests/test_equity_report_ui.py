@@ -82,6 +82,18 @@ class TestRenderers(unittest.TestCase):
         self.assertIn("FOMC scenario (tab 13)", cells)
 
 
+class TestChartLabels(unittest.TestCase):
+    def test_same_side_labels_merge_instead_of_overlapping(self):
+        from src.equity_report.render.charts import latest_signal_labels
+        d = pd.bdate_range("2026-09-14", periods=5)
+        pos = {dt: i for i, dt in enumerate(d)}
+        sig = pd.DataFrame({"date": [d[1], d[3], d[4]], "name": ["Doji", "Hanging Man", "Hanging Man"],
+                            "direction": ["neutral", "bear", "bear"], "strength": [1, 2, 2]})
+        self.assertEqual(latest_signal_labels(sig, pos), [(4, "Hanging Man ×2", "bear")])
+        sig.loc[2, ["name", "direction"]] = ["Hammer", "bull"]
+        self.assertEqual(sorted(latest_signal_labels(sig, pos)), [(3, "Hanging Man", "bear"), (4, "Hammer", "bull")])
+
+
 class TestRegimeInputs(unittest.TestCase):
     def _frame(self, end, demo=False):
         idx = pd.date_range(end=end, periods=3, freq="MS")

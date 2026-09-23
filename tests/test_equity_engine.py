@@ -135,6 +135,13 @@ class TestEdgarParser(unittest.TestCase):
         self.assertEqual(list(eps.values), [2.70, 3.00])
         self.assertEqual(str(eps.index[-1].date()), "2025-11-03")
 
+    def test_latest_annual_filing_ignores_newer_10q(self):
+        import copy
+        facts = copy.deepcopy(self.facts)
+        facts["facts"]["us-gaap"]["RevenueFromContractWithCustomerExcludingAssessedTax"]["units"]["USD"].append(
+            {"start": "2025-09-28", "end": "2025-12-27", "val": 40.0, "filed": "2026-01-30", "form": "10-Q", "fp": "Q1"})
+        self.assertEqual(data_us.latest_annual_filing(facts), "2025-11-03")
+
     def test_ifrs_filer_is_unsupported(self):
         with self.assertRaises(data_us.UnsupportedFiler):
             data_us.annual_table({"facts": {"ifrs-full": {}}})
@@ -150,6 +157,7 @@ class TestEdgarParser(unittest.TestCase):
         self.assertEqual(b["cik"], "0001234567")
         self.assertEqual(b["shares"], 1000.0)
         self.assertTrue(b["pe_history"].dropna().size > 0)
+        self.assertIn("latest 10-K filed 2025-11-03", b["sources"][1])
 
     def test_unknown_ticker(self):
         data_us._mem.clear()
