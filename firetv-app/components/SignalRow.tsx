@@ -32,6 +32,9 @@ const SignalRow = ({
   return (
     <TouchableOpacity
       hasTVPreferredFocus={hasTVPreferredFocus}
+      // react-native-tvos fades a focused TouchableOpacity to activeOpacity (0.2 by
+      // default), which made the selected row look disabled; the border marks focus.
+      activeOpacity={1}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={[styles.row, focused && styles.rowFocused]}>
