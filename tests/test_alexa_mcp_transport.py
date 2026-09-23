@@ -116,8 +116,11 @@ class TestMcpTransports(unittest.TestCase):
         page = data.decode() if isinstance(data, bytes) else data
         self.assertIn("<title>MacroPulse Alexa+ MCP Server</title>", page)
         self.assertIn(f"127.0.0.1:{self.port}/mcp", page)
-        for tool in ("get_macro_regime", "simulate_fomc_shock", "scan_quant_signals"):
-            self.assertIn(tool, page)
+        for tool in EXPECTED_TOOLS:                      # every registered tool is listed for reviewers
+            self.assertIn(f"<code>{tool}</code>", page)
+
+    def test_landing_list_matches_registered_tools(self):
+        self.assertEqual({n for n, _ in srv._LANDING_TOOLS}, EXPECTED_TOOLS)
 
     def test_privacy_and_terms_pages(self):
         for path, marker in (("/privacy", "Privacy Policy"), ("/terms", "Terms of Use")):

@@ -985,6 +985,8 @@ _LANDING_TOOLS = [
     ("scan_quant_signals", "Breakout / squeeze / Bollinger signal scan."),
     ("get_expected_returns", "Static reference estimate of expected returns (labelled as such)."),
     ("simulate_fomc_shock", "Cross-asset PnL and VaR under FOMC rate-shock scenarios."),
+    ("get_morning_brief", "Pre-market brief for an Alexa Routine: S&P close, regime, rates, SPY signal, daily scan leaders."),
+    ("get_equity_report", "Regime-weighted DCF fair value, scenarios, rating and levels for a US 10-K filer (SEC EDGAR)."),
 ]
 
 _PAGE_CSS = """
