@@ -19,6 +19,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter as L
 
 from ..engine.analysis import Report
+from ..engine.dcf import FOMC_NOTE
 
 FONT = "Arial"
 BLUE, GREEN, BLACK, WHITE = "0000FF", "008000", "000000", "FFFFFF"
@@ -244,9 +245,27 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
         for j in range(len(steps)):
             cell = ws.cell(row=12 + i, column=2 + j, value=f'=IFERROR({L(2 + j)}{5 + i}/Assumptions!$B$8-1,"")')
             cell.font, cell.number_format = _f(), F_PCT
-    ws.column_dimensions["A"].width = 16
+    # FOMC shock overlay (tab 13 scenarios): each one is a (WACC, g) point on the grid above.
+    _hdr(ws, 18, ["FOMC scenario (tab 13)", "d rf", "d ERP", "d spread", "d g", "WACC", "g", "Value / share ($)",
+                  "vs. price", "Tab-13 price shock"])
+    for i, x in enumerate(val.get("fomc_overlay", [])):
+        r = 19 + i
+        ws.cell(row=r, column=1, value=x["title"]).font = _f()
+        for col, k in ((2, "d_rf"), (3, "d_erp"), (4, "d_spread"), (5, "d_g")):
+            _put(ws, f"{L(col)}{r}", x[k], '0.00%;(0.00%);"-"', BLUE)
+        _put(ws, f"F{r}", f"=Assumptions!$B$24*(Assumptions!$B$12+B{r}+Assumptions!$B$16*(Assumptions!$B$15+C{r}))"
+                          f"+(1-Assumptions!$B$24)*(Assumptions!$B$18+B{r}+D{r})*(1-Assumptions!$B$19)", F_PCT)
+        _put(ws, f"G{r}", f"=Assumptions!$B$28+E{r}", F_PCT)
+        _put(ws, f"H{r}", (f'=IFERROR((SUMPRODUCT({rf_}/(1+F{r})^{rt_})+DCF!${lc}$8*(1+G{r})/(F{r}-G{r})'
+                           f'/(1+F{r})^DCF!${lc}$5-Assumptions!$B$23)*1E6/Assumptions!$B$9,"")'), F_PS, bold=True)
+        _put(ws, f"I{r}", f'=IFERROR(H{r}/Assumptions!$B$8-1,"")', F_PCT)
+        _put(ws, f"J{r}", x["tab13_price_shock"], F_PCT, BLUE)
+    ws.cell(row=24, column=1, value=FOMC_NOTE).font = _f("595959", size=9)
+    ws.column_dimensions["A"].width = 38
     for j in range(len(steps)):
         ws.column_dimensions[L(2 + j)].width = 14
+    for c in "HIJ":
+        ws.column_dimensions[c].width = 16
 
     # ── Scenarios (regime-weighted) ──
     wsc = wb.create_sheet("Scenarios")

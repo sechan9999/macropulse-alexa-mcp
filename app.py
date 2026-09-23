@@ -783,6 +783,10 @@ st.markdown("---")
 # ══════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════
+if st.query_params.get("ticker"):
+    st.info(f"📑 Equity report for **{st.query_params['ticker'].upper()}** is being built in the "
+            "**📑 Equity Report** tab (last tab).")
+
 tab1,tab2,tab3,tab4,tab5,tab6,tab7,tab8,tab9,tab10,tab11,tab12,tab13,tab14 = st.tabs([
     "📈 Performance","🌍 Macro & Rates","🔍 Regime","🤖 Expected Returns",
     "📊 Screener","📉 Technical","🎲 Risk Sim","✨ AI Analyst",
@@ -1219,11 +1223,18 @@ with tab6:
             show["_ord"] = show["Zone"].map(zone_order).fillna(9)
             show = show.sort_values(["_ord","RSI(W)"]).drop(columns=["_ord"])
             show = show[display_cols]
+            # 📑 one click from a scanner row to the full equity report (?ticker= deep link auto-generates it)
+            from src.equity_report.engine.analysis import report_url
+            show["Report"]      = show["Ticker"].map(report_url)
             show["Price"]       = show["Price"].map(lambda v: f"${v:,.2f}")
             show["MA20W"]       = show["MA20W"].map(lambda v: f"${v:,.2f}")
             show["MA50W"]       = show["MA50W"].map(lambda v: f"${v:,.2f}")
             show["MA20 dist %"] = show["MA20 dist %"].map(lambda v: f"{v:+.1f}%")
-            st.dataframe(show, use_container_width=True, hide_index=True)
+            st.dataframe(show, use_container_width=True, hide_index=True, column_config={
+                "Report": st.column_config.LinkColumn(
+                    "📑 Report", display_text="Equity report ↗",
+                    help="Opens the app with ?ticker=… — the 📑 Equity Report tab builds the DCF / Excel / Word pack "
+                         "(US 10-K filers only; ETFs and 20-F filers such as TSM/ASML are refused)")})
 
             st.download_button(
                 "📥 Export buy-zone scan to CSV",
@@ -2649,11 +2660,11 @@ with tab12:
         # ── 2b. Equity report downloads (same engine + files as the 📑 Equity Report tab) ──
         if res.get("tool_selected") == "get_equity_report" and res.get("status") == "success":
             try:
-                from src.equity_report.ui import download_row, generate, regime_inputs
+                from src.equity_report.ui import download_row, generate, market_view, regime_inputs
                 _t = res["tool_args"].get("ticker", "AAPL")
                 _reg, _rf, _src = regime_inputs(df)
                 with st.spinner(f"Rendering the {_t} Excel / Word / dashboard files…"):
-                    _er = generate(st, _t, _reg, _src, _rf)
+                    _er = generate(st, _t, _reg, _src, _rf, market=market_view(df_raw))
                 st.markdown(f"**📑 {_t} research pack** — same files as the Equity Report tab:")
                 download_row(st, _er, "alexa_er")
             except Exception as _e:
@@ -2952,6 +2963,6 @@ with tab14:
     render_methodology("equity_report", st)
     try:
         from src.equity_report.ui import render_tab as render_equity_report
-        render_equity_report(st, components, df)
+        render_equity_report(st, components, df, df_raw)
     except Exception as e:
         st.error(f"Equity Report failed to load: {e}")

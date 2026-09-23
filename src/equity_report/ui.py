@@ -36,25 +36,35 @@ def regime_inputs(macro_df) -> tuple[str | None, float | None, str]:
         return None, None, f"regime unavailable ({type(e).__name__}) -> neutral weights"
 
 
-def _generate_uncached(ticker: str, regime_label, regime_source, risk_free, erp, tg, provider, theme):
+def market_view(macro_df) -> dict | None:
+    """S&P 500 12m expected return from the tab-4 Ridge model on the full macro history (None -> driftless)."""
+    from .engine.market_drift import expected_market_return
+    try:
+        return expected_market_return(macro_df)
+    except Exception:  # noqa: BLE001 - touch probabilities fall back to driftless
+        return None
+
+
+def _generate_uncached(ticker: str, regime_label, regime_source, risk_free, erp, tg, provider, theme, market=None):
     from .engine.analysis import compact_summary
     from .engine.pipeline import run
     from .render import build_all
     rep = run(ticker, assumptions=DCFAssumptions(equity_risk_premium=erp, terminal_growth=tg),
-              regime_label=regime_label, regime_source=regime_source, risk_free=risk_free, provider=provider)
+              regime_label=regime_label, regime_source=regime_source, risk_free=risk_free, provider=provider,
+              market=market)
     files = build_all(rep, dashboard_theme=theme)
     return {"files": files, "summary": compact_summary(rep), "issues": rep.issues, "method": rep.narrative_method}
 
 
-def _generate_by_day(ticker, regime_label, regime_source, risk_free, erp, tg, provider, theme, day):
-    return _generate_uncached(ticker, regime_label, regime_source, risk_free, erp, tg, provider, theme)
+def _generate_by_day(ticker, regime_label, regime_source, risk_free, erp, tg, provider, theme, day, market=None):
+    return _generate_uncached(ticker, regime_label, regime_source, risk_free, erp, tg, provider, theme, market)
 
 
 _CACHED = None
 
 
 def generate(st, ticker, regime_label=None, regime_source="", risk_free=None, erp=0.05, tg=0.025,
-             provider="auto", theme="dark"):
+             provider="auto", theme="dark", market=None):
     """Cached per (inputs, calendar day) for 6 hours; raises UnsupportedFiler / DataUnavailable."""
     global _CACHED
     if _CACHED is None:
@@ -62,7 +72,7 @@ def generate(st, ticker, regime_label=None, regime_source="", risk_free=None, er
     fn = _CACHED
     rf = None if risk_free is None else round(float(risk_free), 5)
     return fn(ticker.upper().strip(), regime_label, regime_source, rf, round(erp, 5), round(tg, 5), provider, theme,
-              datetime.now().strftime("%Y-%m-%d"))
+              datetime.now().strftime("%Y-%m-%d"), market)
 
 
 def download_row(st, res: dict, key: str) -> None:
@@ -92,12 +102,15 @@ def _error(st, e: Exception, ticker: str) -> None:
         st.error(f"Report failed for **{ticker}**: {type(e).__name__}: {e}")
 
 
-def render_tab(st, components, macro_df=None) -> None:
+def render_tab(st, components, macro_df=None, drift_df=None) -> None:
+    """macro_df: the sidebar-window macro frame (regime, 10Y). drift_df: full macro history for the Ridge
+    S&P 500 view that sets the touch-probability drift (defaults to macro_df)."""
     st.markdown("### 📑 Equity Report — ticker in, research pack out")
     st.caption("Excel DCF model (live formulas) · Word research note · interactive DCF dashboard · Monthly/Weekly/Daily "
                "KD·MACD·candlestick charts. Fundamentals from SEC EDGAR 10-K filings, prices from Yahoo Finance, "
                "scenario weights from the MacroPulse regime. **Not investment advice.**")
     regime_label, rf_live, regime_src = regime_inputs(macro_df)
+    market = market_view(drift_df if drift_df is not None else macro_df)
     qp = st.query_params.get("ticker", "") if hasattr(st, "query_params") else ""
     c1, c2, c3 = st.columns([2, 2, 1])
     with c1:
@@ -116,13 +129,20 @@ def render_tab(st, components, macro_df=None) -> None:
                                       key="er_rf")
     rf = rf_override if rf_override > 0 else rf_live
     st.caption(f"Regime overlay: **{regime_label or 'Neutral (no live regime)'}** · {regime_src} · risk-free "
-               f"{'%.2f%%' % (rf * 100) if rf else 'fallback 4.25%'}")
+               f"{'%.2f%%' % (rf * 100) if rf else 'fallback 4.25%'} · touch-probability drift: "
+               + (f"Ridge S&P 500 E[R] {market['expected_return'] * 100:+.1f}% ({market['as_of']})" if market
+                  else "none (driftless, not enough macro history)"))
 
-    if go and ticker:
+    # Deep link (?ticker=... from the Buy Zone scanner, Alexa or MCP report_url): generate once on arrival.
+    auto = bool(qp) and st.session_state.get("er_autorun_done") != qp.upper().strip()
+    if auto:
+        st.session_state["er_autorun_done"] = qp.upper().strip()
+        ticker = qp.upper().strip()
+    if (go or auto) and ticker:
         with st.spinner(f"Pulling SEC filings and prices for {ticker}, running DCF and rendering files…"):
             try:
                 st.session_state["er_result"] = generate(st, ticker, regime_label, regime_src, rf, erp, tg,
-                                                         PROVIDERS[prov_label])
+                                                         PROVIDERS[prov_label], market=market)
                 st.session_state["er_error"] = None
             except Exception as e:  # noqa: BLE001
                 st.session_state["er_result"], st.session_state["er_error"] = None, (e, ticker)

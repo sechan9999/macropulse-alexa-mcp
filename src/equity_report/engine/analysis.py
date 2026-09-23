@@ -16,8 +16,10 @@ import numpy as np
 import pandas as pd
 
 from ..config import DCFAssumptions
+from ..config import APP_URL
 from . import dcf as dcf_mod
 from . import indicators as ind
+from . import market_drift
 from . import patterns as pat
 from .regime import overlay as make_overlay
 
@@ -105,11 +107,13 @@ def rule_opinion(ctx: dict) -> dict:
     t2_tech = res[1] if len(res) > 1 else t1 * 1.05
     t2 = max(t2_tech, v["expected_per_share"]) if v["expected_per_share"] > t1 else t2_tech
     sig = ctx["volatility_annual"]
+    nu = ctx["drift"]["log_drift"]
     tp = dcf_mod.touch_probability
+    lv = {"stop": stop, "target1": t1, "target2": t2}
     return {"score": round(score, 2), "rating": rating, "basis": " · ".join(basis),
-            "levels": {"stop": stop, "target1": t1, "target2": t2,
-                       "touch_prob_6m": {"stop": tp(price, stop, sig, 0.5), "target1": tp(price, t1, sig, 0.5),
-                                         "target2": tp(price, t2, sig, 0.5)},
+            "levels": {**lv,
+                       "touch_prob_6m": {k: tp(price, x, sig, 0.5, nu) for k, x in lv.items()},
+                       "touch_prob_6m_driftless": {k: tp(price, x, sig, 0.5) for k, x in lv.items()},
                        "reward_risk": (t1 - price) / (price - stop) if price > stop else None}}
 
 
@@ -127,7 +131,8 @@ class Report:
 
 
 def analyze(bundle: dict, assumptions: DCFAssumptions | None = None, regime_label: str | None = None,
-            regime_source: str = "MacroPulse regime engine") -> Report:
+            regime_source: str = "MacroPulse regime engine", market: dict | None = None) -> Report:
+    """`market` is market_drift.expected_market_return(...) (the tab-4 Ridge S&P view) or None (driftless)."""
     mtf = ind.multi_timeframe(bundle["prices"])
     daily = mtf["Daily"][0]
     screen = pat.screen(daily)
@@ -181,9 +186,11 @@ def analyze(bundle: dict, assumptions: DCFAssumptions | None = None, regime_labe
             "fcf_margin": a["fcf_margin_used"], "tv_share_of_ev": val["base"]["tv_share_of_ev"],
             "sensitivity_min": float(np.nanmin(val["sensitivity"].values)),
             "sensitivity_max": float(np.nanmax(val["sensitivity"].values)),
+            "fomc_overlay": val["fomc_overlay"], "fomc_note": dcf_mod.FOMC_NOTE,
             "relative_bands": val["bands"], "range_52w": val["range_52w"], "notes": val["notes"],
         },
         "volatility_annual": val["sigma_annual"],
+        "drift": market_drift.stock_drift(market, a["risk_free_used"], a["beta_used"], val["sigma_annual"]),
         "data_sources": bundle.get("sources", []),
         "not_available": ["news", "analyst consensus estimates", "earnings calendar"],
     }
@@ -197,8 +204,11 @@ Use ONLY the JSON context below. Rules:
 - Quote numbers only from the context; if you compute something, show the short formula.
 - Items listed in context.not_available (news, consensus, earnings calendar) are not connected:
   write "not connected" instead of inventing them.
-- Probabilities: use only context.rule_based.levels.touch_prob_6m and state its assumption
-  (driftless log-normal touch probability, not a directional forecast).
+- Probabilities: use only context.rule_based.levels.touch_prob_6m and state its assumption: log-normal touch
+  probability with the drift in context.drift (S&P 500 expected return from the MacroPulse Ridge model via
+  CAPM), or driftless when context.drift.source is "none (driftless)". touch_prob_6m_driftless is the
+  zero-drift comparison.
+- Mention context.valuation.fomc_overlay (tab-13 FOMC shock scenarios on the WACC x g grid) in section 4.
 - Explain how the macro regime (context.macro_regime) changed the scenario weights and ERP.
 - If company.synthetic_data is true, start with a bold line "SYNTHETIC DEMO DATA — not a real company".
 - No hype. End with the line "Not investment advice."
@@ -290,6 +300,9 @@ def rule_based_text(ctx: dict) -> str:
           f"{_usd(v['sensitivity_min'])}–{_usd(v['sensitivity_max'])}.",
           *[f"{m} band (10th/50th/90th pct): {_usd(b['low'])} / {_usd(b['mid'])} / {_usd(b['high'])}."
             for m, b in v["relative_bands"].items()],
+          "FOMC shock overlay (tab 13 scenarios): " + "; ".join(
+              f"{x['title']} → WACC {x['wacc']:.2%}, g {x['terminal_growth']:.1%}, {_usd(x['per_share'])} "
+              f"({_pct(x['upside'])})" for x in v.get("fomc_overlay", [])) + ".",
           *[f"Note: {n}" for n in v["notes"]], "",
           "## 5. Macro Regime Overlay", "",
           f"MacroPulse regime: **{rg['regime']}** ({rg['source']}). Scenario weights bear/base/bull = "
@@ -300,13 +313,24 @@ def rule_based_text(ctx: dict) -> str:
           "| Level | Price | vs. current | 6-month touch probability* |", "|---|---|---|---|",
           *[f"| {nm} | {_usd(lv[k])} | {_pct(lv[k] / c['price'] - 1)} | {(lv['touch_prob_6m'][k] or 0):.0%} |"
             for nm, k in (("Stop", "stop"), ("Target 1", "target1"), ("Target 2", "target2"))],
-          "", f"Reward/risk to target 1: {(lv['reward_risk'] or 0):.2f}. *Driftless log-normal touch probability at "
-          f"{ctx['volatility_annual']:.0%} annualised volatility — a distance yardstick, not a forecast.", "",
+          "", f"Reward/risk to target 1: {(lv['reward_risk'] or 0):.2f}. *{_drift_note(ctx)}", "",
           "## 7. Risks & What to Watch", "",
           "News, consensus estimates and the earnings calendar are not connected. The DCF is most sensitive to the FCF "
           "margin, terminal growth and WACC; the regime overlay can shift quickly when credit spreads move.", "",
           "Not investment advice."]
     return "\n".join(L)
+
+
+def _drift_note(ctx: dict) -> str:
+    dr, vol = ctx["drift"], ctx["volatility_annual"]
+    if dr.get("stock_expected_return") is None:
+        return (f"Driftless log-normal touch probability at {vol:.0%} annualised volatility — a distance "
+                "yardstick, not a forecast (no market expected-return view was available).")
+    dl = ctx["rule_based"]["levels"]["touch_prob_6m_driftless"]
+    return (f"Log-normal touch probability at {vol:.0%} annualised volatility with drift from the MacroPulse Ridge "
+            f"S&P 500 view: E[R_m] {dr['market_expected_return']:+.1%} (as of {dr['as_of']}) → CAPM E[R] "
+            f"{dr['stock_expected_return']:+.1%}. Driftless for comparison: stop {(dl['stop'] or 0):.0%}, target 1 "
+            f"{(dl['target1'] or 0):.0%}, target 2 {(dl['target2'] or 0):.0%}. A model-conditional estimate, not a forecast.")
 
 
 def narrate(report: Report, provider: str = "auto") -> Report:
@@ -334,6 +358,10 @@ def narrate(report: Report, provider: str = "auto") -> Report:
     return report
 
 
+def report_url(ticker: str) -> str:
+    return f"{APP_URL.rstrip('/')}/?ticker={ticker}"
+
+
 def compact_summary(report: Report) -> dict:
     """Small JSON for MCP / Alexa / Fire TV: the headline numbers plus a spoken sentence."""
     c, v, rb, rg = report.ctx["company"], report.ctx["valuation"], report.ctx["rule_based"], report.ctx["macro_regime"]
@@ -355,10 +383,13 @@ def compact_summary(report: Report) -> dict:
         "scenarios": {k: {"per_share": s["per_share"], "prob": s["prob"]} for k, s in v["scenarios"].items()},
         "wacc": v["wacc"], "terminal_growth": v["terminal_growth"], "macro_regime": rg,
         "levels": {k: lv[k] for k in ("stop", "target1", "target2")}, "touch_prob_6m": lv["touch_prob_6m"],
+        "touch_prob_6m_driftless": lv["touch_prob_6m_driftless"],
+        "drift": {k: report.ctx["drift"].get(k) for k in ("source", "market_expected_return", "stock_expected_return")},
+        "fomc_overlay": {x["scenario"]: {"per_share": x["per_share"], "wacc": x["wacc"]} for x in v["fomc_overlay"]},
         "pattern_screen": {k: report.screen[k] for k in ("bullish_count", "bearish_count", "bull_score",
                                                           "bear_score", "overall")},
         "weekly_trend": wk["ma_alignment"], "data_sources": report.ctx["data_sources"],
         "synthetic_data": c["synthetic_data"],
-        "report_url": f"https://hf-macro-dashboard.streamlit.app/?ticker={c['ticker']}",
+        "report_url": report_url(c["ticker"]),
         "alexa_spoken_response": spoken,
     })

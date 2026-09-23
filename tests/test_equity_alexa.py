@@ -9,6 +9,7 @@ import time
 import unittest
 from unittest import mock
 
+import numpy as np
 import pandas as pd
 
 import src.alexa_mcp_server as srv
@@ -22,9 +23,19 @@ def _fake_download(ticker, period, timeout=8):
     return synthetic.price_frame(seed=3)
 
 
-def _fake_macro():
+def _fake_macro(series=None):
+    if series is srv._DRIFT_SERIES:                  # 10y history for the Ridge S&P 500 view
+        return _long_macro()
     idx = pd.date_range(end=pd.Timestamp.today(), periods=3, freq="MS")
     return pd.DataFrame({"regime": ["Neutral 🟡", "Neutral 🟡", "Risk-Off 🔴"], "dgs10": [4.1, 4.2, 4.4]}, index=idx)
+
+
+def _long_macro(n=120, seed=2):
+    rng = np.random.default_rng(seed)
+    idx = pd.date_range(end=pd.Timestamp.today(), periods=n, freq="ME")
+    ret = rng.normal(0.007, 0.04, n)
+    return pd.DataFrame({"sp500": 1000 * np.exp(np.cumsum(ret)), "dgs10": 3 + np.cumsum(rng.normal(0, 0.1, n)),
+                         "credit_spread": 0.02 + np.abs(rng.normal(0, 0.005, n))}, index=idx)
 
 
 def _fake_sec(url):
@@ -60,6 +71,10 @@ class TestEquityOverAlexa(unittest.TestCase):
         for k in ("bullish_count", "bearish_count", "bull_score", "bear_score", "overall"):
             self.assertIn(k, res["pattern_screen"])
         self.assertIn("?ticker=FIX", res["report_url"])
+        self.assertIn("Ridge", res["drift"]["source"])               # touch probabilities use the Ridge drift
+        self.assertIsNotNone(res["drift"]["stock_expected_return"])
+        self.assertEqual(set(res["fomc_overlay"]), {"hawkish_50bps", "dovish_50bps", "stagflation_inversion",
+                                                    "liquidity_cascade"})
         self.assertGreater(len(res["alexa_spoken_response"]), 40)
         json.dumps(res)
 
@@ -68,6 +83,12 @@ class TestEquityOverAlexa(unittest.TestCase):
         t0 = time.perf_counter()
         srv.execute_get_equity_report("FIX")
         self.assertLess(time.perf_counter() - t0, 0.5)          # Alexa+ 500 ms budget
+
+    def test_short_macro_history_falls_back_to_driftless(self):
+        with mock.patch.object(srv, "_fetch_cached_macro_data", side_effect=lambda series=None: _fake_macro()):
+            res = srv.execute_get_equity_report("FIX")
+        self.assertEqual(res["drift"]["source"], "none (driftless)")
+        self.assertEqual(res["touch_prob_6m"], res["touch_prob_6m_driftless"])
 
     def test_foreign_filer_is_refused_not_guessed(self):
         with self.assertRaises(srv.EquityReportUnsupported):

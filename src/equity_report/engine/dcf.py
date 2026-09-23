@@ -89,13 +89,63 @@ def sensitivity(inp: DCFInputs, fcf_path: np.ndarray, waccs, gs) -> pd.DataFrame
     return out
 
 
-def touch_probability(price: float, target: float, sigma_annual: float, years: float) -> float:
-    """Driftless log-normal probability that price touches target at least once within `years`
-    (reflection principle). A distance-vs-volatility yardstick, not a directional forecast."""
+def touch_probability(price: float, target: float, sigma_annual: float, years: float, drift: float = 0.0) -> float:
+    """Probability that a log-normal price touches `target` at least once within `years`.
+
+    `drift` is the annual drift of log price (nu). First passage of Brownian motion with drift to the
+    barrier b = ln(target / price):
+        up   (b > 0): Phi((nu T - b) / s) + exp(2 nu b / sigma^2) Phi((-b - nu T) / s)
+        down (b < 0): Phi((b - nu T) / s) + exp(2 nu b / sigma^2) Phi((b + nu T) / s),   s = sigma sqrt(T)
+    With nu = 0 this is the reflection-principle value 2 [1 - Phi(|b| / s)]."""
     if price <= 0 or target <= 0 or sigma_annual <= 0:
         return float("nan")
-    z = abs(np.log(target / price)) / (sigma_annual * np.sqrt(years))
-    return float(min(1.0, 2 * (1 - norm.cdf(z))))
+    b, s, nu, var = np.log(target / price), sigma_annual * np.sqrt(years), drift, sigma_annual ** 2
+    if b == 0:
+        return 1.0
+    if b > 0:
+        p = norm.cdf((nu * years - b) / s) + np.exp(2 * nu * b / var) * norm.cdf((-b - nu * years) / s)
+    else:
+        p = norm.cdf((b - nu * years) / s) + np.exp(2 * nu * b / var) * norm.cdf((b + nu * years) / s)
+    return float(min(1.0, max(0.0, p)))
+
+
+# FOMC shocks from the Multi-Asset Sync & FOMC Shock tab (tab 13), translated into discount-rate inputs.
+# Illustrative, assumption-based (like tab 13's own shocks): not estimated from data.
+FOMC_RATE_SHOCKS = {
+    #                          title                                       d_rf     d_erp    d_spread d_g
+    "hawkish_50bps":         ("Hawkish Surprise (+50 bps Hike)",          +0.0050, +0.0025, +0.0025, 0.0),
+    "dovish_50bps":          ("Dovish Pivot (-50 bps Cut)",               -0.0050, -0.0025, -0.0010, 0.0),
+    "stagflation_inversion": ("Stagflation & Curve Inversion Shock",      +0.0025, +0.0075, +0.0120, -0.0050),
+    "liquidity_cascade":     ("March 2020 Correlated Liquidity Crunch",   -0.0025, +0.0150, +0.0200, 0.0),
+}
+FOMC_NOTE = ("Tab 13 FOMC scenarios mapped to risk-free / ERP / credit-spread / terminal-growth shifts "
+             "(illustrative assumptions, not estimated). FCF path held fixed, as in the sensitivity grid.")
+
+
+def _tab13_price_shock(ticker: str, scenario: str) -> float | None:
+    """The illustrative single-name price shock tab 13 applies to this ticker (None if unavailable)."""
+    try:
+        from src.brokerage_sync import BrokeragePortfolio
+        return BrokeragePortfolio({ticker: 1.0}).simulate_fomc_shock(scenario)["total_pnl_pct"] / 100
+    except Exception:  # noqa: BLE001 - reference column only
+        return None
+
+
+def fomc_overlay(inp: "DCFInputs", fcf_path: np.ndarray, *, risk_free: float, beta: float, erp: float,
+                 cost_of_debt: float, tax_rate: float, weight_equity: float, ticker: str | None = None) -> list[dict]:
+    """Value per share at each FOMC scenario's (WACC, g) point, to overlay on the WACC x g grid."""
+    out = []
+    for key, (title, d_rf, d_erp, d_sp, d_g) in FOMC_RATE_SHOCKS.items():
+        ke = risk_free + d_rf + beta * (erp + d_erp)
+        kd = (cost_of_debt + d_rf + d_sp) * (1 - tax_rate)
+        w = weight_equity * ke + (1 - weight_equity) * kd
+        g = inp.terminal_growth + d_g
+        ps = float(sensitivity(inp, fcf_path, [w], [g]).iloc[0, 0])
+        out.append({"scenario": key, "title": title, "d_rf": d_rf, "d_erp": d_erp, "d_spread": d_sp, "d_g": d_g,
+                    "wacc": w, "d_wacc": w - inp.wacc, "terminal_growth": g, "per_share": ps,
+                    "upside": ps / inp.price - 1 if np.isfinite(ps) else float("nan"),
+                    "tab13_price_shock": _tab13_price_shock(ticker, key) if ticker else None})
+    return out
 
 
 def build(bundle: dict, a: DCFAssumptions | None = None, regime: RegimeOverlay | None = None) -> dict:
@@ -149,6 +199,8 @@ def build(bundle: dict, a: DCFAssumptions | None = None, regime: RegimeOverlay |
         notes.append(f"Terminal value is {base['tv_share_of_ev']:.0%} of EV: highly sensitive to WACC and g.")
 
     sens = sensitivity(inp, base["fcf"], wacc + SENS_STEPS, a.terminal_growth + SENS_STEPS)
+    fomc = fomc_overlay(inp, base["fcf"], risk_free=rf, beta=beta, erp=erp, cost_of_debt=kd, tax_rate=a.tax_rate,
+                        weight_equity=w_e, ticker=None if bundle.get("is_synthetic") else bundle.get("ticker"))
 
     scen = {}
     for k, s in SCENARIO_SHIFTS.items():
@@ -184,7 +236,7 @@ def build(bundle: dict, a: DCFAssumptions | None = None, regime: RegimeOverlay |
                         "weight_equity": w_e, "wacc": wacc, "growth_high_used": g_high,
                         "revenue_cagr_hist": float(cagr), "fcf_margin_used": margin},
         "regime": ov.as_dict(),
-        "inputs": asdict(inp), "base": base, "sensitivity": sens, "scenarios": scen,
+        "inputs": asdict(inp), "base": base, "sensitivity": sens, "fomc_overlay": fomc, "scenarios": scen,
         "expected_per_share": float(expected), "expected_upside": float(expected / price - 1),
         "neutral_weight_expected": float(neutral_expected),
         "bands": bands, "range_52w": {"low": float(px.iloc[-252:].min()), "high": float(px.iloc[-252:].max())},
