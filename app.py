@@ -460,6 +460,9 @@ def fetch_stock(ticker: str, start: str, end: str):
     return df, info
 
 # ── Screener helper ──────────────────────────────────────────────────
+SCREENER_MIN_HISTORY_DAYS = 420   # ≥ 200 trading days for SMA200, whatever the screen period
+
+
 def _screen_one(ticker: str, period_days: int):
     try:
         tkr = yf.Ticker(ticker)
@@ -467,10 +470,14 @@ def _screen_one(ticker: str, period_days: int):
         last_price = getattr(fi,"last_price", None)
         if last_price is None:
             return None
-        # raw float columns — fix #2
-        hist = tkr.history(period=f"{period_days}d", auto_adjust=True)
+        # raw float columns — fix #2. Indicators (SMA200 needs 200 trading days ≈ 290 calendar
+        # days) always get enough history; the selected period only drives "Period Ret".
+        hist = tkr.history(period=f"{max(period_days, SCREENER_MIN_HISTORY_DAYS)}d", auto_adjust=True)
         if hist.empty or len(hist) < 5:
             return None
+        cutoff = hist.index[-1] - pd.Timedelta(days=period_days)
+        in_window = hist["Close"][hist.index >= cutoff]
+        period_ret = (float(in_window.iloc[-1]) / float(in_window.iloc[0]) - 1) if len(in_window) > 1 else np.nan
         ret_1m_raw = hist["Close"].pct_change(21).iloc[-1]
         ret_5d     = hist["Close"].pct_change(5).iloc[-1]
         # YTD — fix #1
@@ -502,6 +509,7 @@ def _screen_one(ticker: str, period_days: int):
         return {
             "Ticker": ticker,
             "Price": last_price,
+            "Period Ret": period_ret,
             "1M Ret": ret_1m_raw,   # raw float
             "5D Ret": ret_5d,
             "YTD":    ytd_raw,      # raw float
@@ -775,7 +783,8 @@ st.markdown(f"""<div style="background:{bg}; border-left:4px solid {bd}; padding
 border-radius:8px; margin:12px 0; font-size:.95rem; color:#ffffff; font-weight:500; 
 box-shadow: 0 4px 15px rgba(0,0,0,0.3); display:flex; align-items:center;">
 <span style="opacity:0.9;">Current Regime:</span>&nbsp;<b style="color:{bd}; font-size:1.05rem;">{cr}</b> 
-&nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">Score:</span>&nbsp;<b>{df['regime_score'].iloc[-1]:.2f}</b>
+&nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">Stress score:</span>&nbsp;<b>{df['regime_score'].iloc[-1]:+.2f}</b>
+&nbsp;<span style="opacity:0.7; font-size:.8rem;">(credit + volatility z-score · below −0.5 Risk-On · above +0.5 Risk-Off)</span>
 &nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">as of</span>&nbsp;<b>{df.index[-1].strftime('%b %Y')}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("---")
@@ -1125,7 +1134,7 @@ with tab5:
         period_map = {"1mo":30,"3mo":90,"6mo":180,"1yr":365}
         period_days = period_map[screen_period]
     with col_s:
-        sort_col = st.selectbox("Sort By", ["1M Ret","YTD","RSI","5D Ret"], index=0)
+        sort_col = st.selectbox("Sort By", ["Period Ret","1M Ret","YTD","RSI","5D Ret"], index=0)
 
     run_btn = st.button("🔎 Run Screener", type="primary")
     if run_btn:
@@ -1141,6 +1150,8 @@ with tab5:
         sc_df = sc_df.sort_values(sort_col, ascending=False)
         display = sc_df.copy()
         # Format for display — keep raw floats in sc_df for chart
+        display["Period Ret"] = display["Period Ret"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "—")
+        display = display.rename(columns={"Period Ret": f"{screen_period} Ret"})
         display["1M Ret"] = display["1M Ret"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "—")
         display["5D Ret"] = display["5D Ret"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "—")
         display["YTD"]    = display["YTD"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "—")
@@ -1154,7 +1165,7 @@ with tab5:
                 v = float(str(val).replace("%","").replace("+",""))
                 return "color:#34d399" if v>0 else "color:#f87171" if v<0 else ""
             except: return ""
-        styled = display.style.map(color_ret, subset=["1M Ret","5D Ret","YTD"])
+        styled = display.style.map(color_ret, subset=[f"{screen_period} Ret","1M Ret","5D Ret","YTD"])
         st.dataframe(styled, use_container_width=True, hide_index=True)
 
         # fix #20: export button
@@ -1736,25 +1747,9 @@ def fetch_nvda_full(period_days: int = 365):
         labels=["Safe Zone 🟢", "Caution ⚠️", "Danger Zone 🔴"]
     ).astype(str)
 
-    # ── 7. Market context peers ───────────────────────────────────────────
-    peers = {"NVDA": "NVDA", "SOX": "SOXX", "AMD": "AMD", "TSM": "TSM",
-             "AVGO": "AVGO", "MU": "MU"}
-    ctx_frames = {}
-    for name, tkr in peers.items():
-        try:
-            raw = yf.download(tkr, period=f"{period_days}d",
-                              auto_adjust=True, progress=False, multi_level_index=False)["Close"]
-            if isinstance(raw, pd.DataFrame):
-                raw = raw.iloc[:, 0]
-            raw.index = pd.to_datetime(raw.index).tz_localize(None)
-            ctx_frames[name] = raw
-        except Exception:
-            pass
-    df_ctx = pd.DataFrame(ctx_frames).ffill().dropna()
-    # Normalize to 100
-    df_ctx = df_ctx / df_ctx.iloc[0] * 100
-
-    return df, df_ctx
+    # ── 7. Market context peers (per-ticker fetch + bad-data guard, see src/macro_extras.py) ──
+    from src.macro_extras import fetch_peer_context
+    return df, fetch_peer_context(period_days)
 
 
 # ── Helper: danger zone colour band ──
@@ -2068,6 +2063,10 @@ with tab9:
                 pd.DataFrame(perf_rows),
                 use_container_width=True, hide_index=True
             )
+            _excl = df_ctx_nv.attrs.get("excluded", [])
+            if _excl:
+                st.caption(f"⚠️ Left out: {', '.join(_excl)} — the price feed returned no data or an "
+                           "implausible one-day jump (> 40%), which usually means corrupted data.")
         else:
             st.warning("Could not load peer comparison data.")
 
@@ -2702,10 +2701,11 @@ with tab12:
     # ── Ambient Audio Chimes Control Station ──
     st.markdown("---")
     st.markdown("#### 🔔 Personalized Ambient Audio Chimes (Fire TV & Web)")
-    st.caption("Subtle procedural harmonic audio cues emitted when high-conviction market events trigger:")
+    st.caption("Subtle procedural harmonic audio cues emitted when high-conviction market events trigger. "
+               "Each is a short 1.6-second chime by design (the player shows 0:01), not a placeholder.")
 
     try:
-        from src.ambient_audio import get_chime_base64_data_uri
+        from src.ambient_audio import generate_chime_wav
         _AUDIO_OK = True
     except Exception:
         _AUDIO_OK = False
@@ -2715,26 +2715,22 @@ with tab12:
         with a_col1:
             st.markdown("**Bollinger Squeeze Breakout**")
             st.caption("Ascending C5-G5 bright marimba chime")
-            chime_b64 = get_chime_base64_data_uri("bollinger_breakout")
-            st.audio(chime_b64, format="audio/wav")
+            st.audio(generate_chime_wav("bollinger_breakout"), format="audio/wav")
 
         with a_col2:
             st.markdown("**Credit Spread Divergence**")
             st.caption("Low C3-Eb3 warm resonance gong")
-            chime_b64 = get_chime_base64_data_uri("credit_divergence")
-            st.audio(chime_b64, format="audio/wav")
+            st.audio(generate_chime_wav("credit_divergence"), format="audio/wav")
 
         with a_col3:
             st.markdown("**NVDA Danger Zone Alert**")
             st.caption("F#4-C5 pulsed caution chime")
-            chime_b64 = get_chime_base64_data_uri("danger_zone")
-            st.audio(chime_b64, format="audio/wav")
+            st.audio(generate_chime_wav("danger_zone"), format="audio/wav")
 
         with a_col4:
             st.markdown("**FOMC Rate Shock Bell**")
             st.caption("Resonant A3-C#5 dual-tone bell")
-            chime_b64 = get_chime_base64_data_uri("fomc_shock")
-            st.audio(chime_b64, format="audio/wav")
+            st.audio(generate_chime_wav("fomc_shock"), format="audio/wav")
 
     # ── Client Connection Instructions ──
     with st.expander("🔌 How to Connect an External MCP Client (Claude, Cursor, Alexa+ Gateway)"):

@@ -144,10 +144,43 @@ class Signal:
     error: str | None = None
 
 
-def generate_signal(ticker: str, df: pd.DataFrame) -> Signal:
+# Reason texts: English for the dashboard / APIs, Korean for the daily Korean alert
+# (scripts/daily_signal_alert.py, whose signals/*.md format the MCP morning brief parses).
+REASONS = {
+    "insufficient": ("Not enough data (under 60 trading days)", "데이터 부족 (60거래일 미만)"),
+    "trend_up": ("Bullish alignment (price > 20 > 50 > 200-day MA)", "정배열 상승추세 (가격>20>50>200일선)"),
+    "trend_down": ("Bearish alignment (price < 20 < 50 < 200-day MA)", "역배열 하락추세 (가격<20<50<200일선)"),
+    "above50": ("Trading above the 50-day MA (short-term edge)", "50일선 위에서 거래 중 (단기 우위)"),
+    "below50": ("Trading below the 50-day MA (short-term weakness)", "50일선 아래에서 거래 중 (단기 열위)"),
+    "macd_up": ("MACD histogram expanding (upside momentum accelerating)", "MACD 히스토그램 확대 (상승 모멘텀 가속)"),
+    "macd_down": ("MACD histogram expanding (downside momentum accelerating)", "MACD 히스토그램 확대 (하락 모멘텀 가속)"),
+    "rsi_low": ("RSI {rsi:.0f} oversold", "RSI {rsi:.0f} 과매도 구간"),
+    "rsi_high": ("RSI {rsi:.0f} overbought", "RSI {rsi:.0f} 과매수 구간"),
+    "break_up": ("Upside break after a volatility squeeze (expansion to the buy side)",
+                 "변동성 스퀴즈 이후 상단 돌파 (매수 방향 변동성 확장)"),
+    "break_down": ("Downside break after a volatility squeeze (expansion to the sell side)",
+                   "변동성 스퀴즈 이후 하단 이탈 (매도 방향 변동성 확장)"),
+    "vol_up": ("Up day on {ratio:.1f}x average volume", "평균 대비 {ratio:.1f}배 거래량 동반 상승"),
+    "vol_down": ("Down day on {ratio:.1f}x average volume", "평균 대비 {ratio:.1f}배 거래량 동반 하락"),
+    "extreme": ("Extreme volatility without a directional break: conviction halved",
+                "변동성 극단적으로 높음 — 방향성 신호 아니면 확신도 하향 조정"),
+    "neutral": ("No clear directional signal (neutral)", "뚜렷한 방향성 신호 없음 (중립)"),
+    "no_data": ("No data", "데이터 없음"),
+    "error": ("Error: {err}", "오류: {err}"),
+}
+
+
+def reason(key: str, lang: str = "en", **fmt) -> str:
+    en, ko = REASONS[key]
+    return (ko if lang == "ko" else en).format(**fmt)
+
+
+def generate_signal(ticker: str, df: pd.DataFrame, lang: str = "en") -> Signal:
+    """lang: "en" (default) or "ko" for the reason texts; scores and labels are identical."""
+    R = lambda key, **fmt: reason(key, lang, **fmt)  # noqa: E731
     if df is None or df.empty or len(df) < 60:
         return Signal(ticker, float("nan"), "HOLD", 0, "Unknown", "—",
-                       ["데이터 부족 (60거래일 미만)"], error="insufficient_data")
+                       [R("insufficient")], error="insufficient_data")
 
     last, prev = df.iloc[-1], df.iloc[-2]
     score = 0
@@ -156,50 +189,50 @@ def generate_signal(ticker: str, df: pd.DataFrame) -> Signal:
     # ── Trend alignment (± 25) ──
     price, sma20, sma50, sma200 = last["Close"], last["SMA20"], last["SMA50"], last["SMA200"]
     if pd.notna(sma200) and price > sma20 > sma50 > sma200:
-        score += 25; reasons.append("정배열 상승추세 (가격>20>50>200일선)")
+        score += 25; reasons.append(R("trend_up"))
     elif pd.notna(sma200) and price < sma20 < sma50 < sma200:
-        score -= 25; reasons.append("역배열 하락추세 (가격<20<50<200일선)")
+        score -= 25; reasons.append(R("trend_down"))
     elif price > sma50:
-        score += 10; reasons.append("50일선 위에서 거래 중 (단기 우위)")
+        score += 10; reasons.append(R("above50"))
     elif price < sma50:
-        score -= 10; reasons.append("50일선 아래에서 거래 중 (단기 열위)")
+        score -= 10; reasons.append(R("below50"))
 
     # ── MACD momentum (± 15) ──
     hist, prev_hist = last["MACD_hist"], prev["MACD_hist"]
     if hist > 0 and hist > prev_hist:
-        score += 15; reasons.append("MACD 히스토그램 확대 (상승 모멘텀 가속)")
+        score += 15; reasons.append(R("macd_up"))
     elif hist < 0 and hist < prev_hist:
-        score -= 15; reasons.append("MACD 히스토그램 확대 (하락 모멘텀 가속)")
+        score -= 15; reasons.append(R("macd_down"))
 
     # ── RSI mean-reversion (± 15) ──
     rsi = last["RSI"]
     if pd.notna(rsi):
         if rsi < 30:
-            score += 15; reasons.append(f"RSI {rsi:.0f} 과매도 구간")
+            score += 15; reasons.append(R("rsi_low", rsi=rsi))
         elif rsi > 70:
-            score -= 15; reasons.append(f"RSI {rsi:.0f} 과매수 구간")
+            score -= 15; reasons.append(R("rsi_high", rsi=rsi))
 
     # ── Volatility breakout — the "변동성 포착" core signal (± 20) ──
     is_breakout, direction = detect_vol_breakout(df)
     if is_breakout and direction == "up":
-        score += 20; reasons.append("변동성 스퀴즈 이후 상단 돌파 (매수 방향 변동성 확장)")
+        score += 20; reasons.append(R("break_up"))
     elif is_breakout and direction == "down":
-        score -= 20; reasons.append("변동성 스퀴즈 이후 하단 이탈 (매도 방향 변동성 확장)")
+        score -= 20; reasons.append(R("break_down"))
 
     # ── Volume confirmation (± 10, only when it agrees with the day's move) ──
     vol_ratio = last["VOL_ratio"]
     day_up = last["Close"] >= prev["Close"]
     if pd.notna(vol_ratio) and vol_ratio > 1.5:
         if day_up:
-            score += 10; reasons.append(f"평균 대비 {vol_ratio:.1f}배 거래량 동반 상승")
+            score += 10; reasons.append(R("vol_up", ratio=vol_ratio))
         else:
-            score -= 10; reasons.append(f"평균 대비 {vol_ratio:.1f}배 거래량 동반 하락")
+            score -= 10; reasons.append(R("vol_down", ratio=vol_ratio))
 
     # ── Extreme, non-directional volatility dampens conviction ──
     vol_regime = classify_vol_regime(last["RVOL_pct"])
     if vol_regime == "Extreme" and not is_breakout:
         score = int(score * 0.5)
-        reasons.append("변동성 극단적으로 높음 — 방향성 신호 아니면 확신도 하향 조정")
+        reasons.append(R("extreme"))
 
     score = int(np.clip(score, -100, 100))
     if score >= 40:
@@ -214,7 +247,7 @@ def generate_signal(ticker: str, df: pd.DataFrame) -> Signal:
         label = "HOLD"
 
     if not reasons:
-        reasons.append("뚜렷한 방향성 신호 없음 (중립)")
+        reasons.append(R("neutral"))
 
     return Signal(ticker, float(price), label, score, vol_regime, direction, reasons)
 
@@ -222,26 +255,27 @@ def generate_signal(ticker: str, df: pd.DataFrame) -> Signal:
 # ══════════════════════════════════════════════════════════════════
 # 4) Batch scan — parallel fetch + score, mirrors run_screener() in app.py
 # ══════════════════════════════════════════════════════════════════
-def _scan_one(ticker: str, period: str) -> Signal:
+def _scan_one(ticker: str, period: str, lang: str = "en") -> Signal:
     try:
         raw = yf.Ticker(ticker).history(period=period, auto_adjust=True, timeout=20)
         if raw is None or raw.empty:
             return Signal(ticker, float("nan"), "HOLD", 0, "Unknown", "—",
-                          ["데이터 없음"], error="no_data")
+                          [reason("no_data", lang)], error="no_data")
         df = add_indicators(raw)
-        return generate_signal(ticker, df)
+        return generate_signal(ticker, df, lang)
     except Exception as e:
         return Signal(ticker, float("nan"), "HOLD", 0, "Unknown", "—",
-                      [f"오류: {e}"], error=str(e))
+                      [reason("error", lang, err=e)], error=str(e))
 
 
 def run_quant_scan(tickers: tuple[str, ...] = DEFAULT_UNIVERSE,
-                    period: str = "1y", max_workers: int = 8) -> pd.DataFrame:
+                    period: str = "1y", max_workers: int = 8, lang: str = "en") -> pd.DataFrame:
     """Fetch + score every ticker in parallel. Returns one row per ticker,
-    ranked by |score| so the highest-conviction names surface first."""
+    ranked by |score| so the highest-conviction names surface first.
+    lang: "en" (default) or "ko" for the Reasons column."""
     rows: list[Signal] = []
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
-        futs = {ex.submit(_scan_one, t, period): t for t in tickers}
+        futs = {ex.submit(_scan_one, t, period, lang): t for t in tickers}
         for f in as_completed(futs):
             rows.append(f.result())
 
