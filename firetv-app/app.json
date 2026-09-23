@@ -17,6 +17,11 @@
     "android": {
       "package": "com.macropulse.firetv",
       "versionCode": 2
+    },
+    "extra": {
+      "eas": {
+        "projectId": "da37d086-1769-4e13-a9c9-86f032269cb8"
+      }
     }
   }
 }
