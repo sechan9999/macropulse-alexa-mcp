@@ -32,6 +32,7 @@ from src.alexa_mcp_server import (
     execute_get_expected_returns,
     execute_ask_macro_analyst,
     execute_get_equity_report,
+    execute_get_morning_brief,
     EquityReportUnsupported,
     MarketDataUnavailable,
 )
@@ -53,6 +54,11 @@ class AlexaMacroSkill:
         "signals": ["signal", "breakout", "squeeze", "bollinger", "quant score", "technical signal"],
         "returns": ["expected return", "forecast", "ridge", "projection", "forward return"]
     }
+
+    # Pre-market brief, e.g. from an Alexa Routine action "ask MacroPulse for my morning brief".
+    BRIEF_KEYWORDS = ("morning brief", "market brief", "daily brief", "morning briefing", "market briefing",
+                      "good morning", "pre-market", "premarket", "morning update", "market update",
+                      "catch me up", "brief me")
 
     EQUITY_KEYWORDS = ("equity report", "stock report", "research report", "research note", "report on",
                        "report for", "fair value", "valuation", "dcf", "price target", "intrinsic value")
@@ -105,6 +111,10 @@ class AlexaMacroSkill:
         if any(k in p_low for k in cls.EQUITY_KEYWORDS):
             args["ticker"] = cls.extract_equity_ticker(prompt) or "AAPL"
             return "get_equity_report", args
+
+        # Morning brief (after the equity check: "a market update on Apple" still wants the Apple report)
+        if any(k in p_low for k in cls.BRIEF_KEYWORDS):
+            return "get_morning_brief", args
 
         # Check explicit TV routing keywords
         if is_tv_request:
@@ -342,6 +352,28 @@ class AlexaMacroSkill:
                       f"Bull ${sc['Bull']['per_share']:,.0f} ({sc['Bull']['prob']:.0%}) · "
                       f"Stop ${raw['levels']['stop']:,.0f} · Target ${raw['levels']['target1']:,.0f}")
 
+        elif tool_name == "get_morning_brief":
+            raw = execute_get_morning_brief()
+            chg, spy, lead = raw["sp500_change_pct"], raw["spy_signal"], raw["signal_leaders"]
+            card = {
+                "title": "MacroPulse Morning Brief",
+                "subtitle": (f"As of the {raw['as_of']} close" if raw["as_of"] else "Latest close")
+                            + f" · Regime {raw['regime']}",
+                "badges": [
+                    {"label": "S&P 500", "value": (f"{raw['sp500_close']:,.0f} ({chg:+.1f}%)"
+                                                   if chg is not None else "n/a")},
+                    {"label": "Stress Score", "value": f"{raw['stress_score']:+.2f}"},
+                    {"label": "10Y Yield", "value": f"{raw['treasury_10y']:.2f}%"},
+                    {"label": "SPY Signal", "value": (f"{spy['signal']} {spy['conviction_score']:+d}" if spy else "n/a")},
+                ],
+                "sentiment": "bullish" if "Risk-On" in raw["regime"] else
+                             ("bearish" if "Risk-Off" in raw["regime"] else "neutral"),
+            }
+            if lead:
+                footer = (f"Daily scan {lead['scan_date']} · Buy: "
+                          + (", ".join(r["ticker"] for r in lead["buy"]) or "–")
+                          + " · Sell: " + (", ".join(r["ticker"] for r in lead["sell"]) or "–"))
+
         elif tool_name == "get_macro_regime":
             raw = execute_get_macro_regime()
             card = {
@@ -495,8 +527,8 @@ class AlexaMacroSkill:
         req_type = request_body.get("request", {}).get("type", "LaunchRequest")
         
         if req_type == "LaunchRequest":
-            speech = ("Welcome to MacroPulse. You can ask for today's market regime, say show the NVDA Danger Zone "
-                      "on the TV, or ask for an equity report on a stock like Apple.")
+            speech = ("Welcome to MacroPulse. You can ask for your morning brief, today's market regime, say show "
+                      "the NVDA Danger Zone on the TV, or ask for an equity report on a stock like Apple.")
             return {
                 "version": "1.0",
                 "response": {
@@ -523,7 +555,7 @@ class AlexaMacroSkill:
                     "response": {
                         "outputSpeech": {
                             "type": "PlainText",
-                            "text": "You can ask for today's market regime, check the NVDA danger zone on your TV, or simulate an FOMC rate shock test."
+                            "text": "You can ask for your morning brief, today's market regime, check the NVDA danger zone on your TV, or simulate an FOMC rate shock test. To hear the brief every morning, add 'ask MacroPulse for my morning brief' to an Alexa routine."
                         },
                         "shouldEndSession": False
                     }
@@ -540,6 +572,8 @@ class AlexaMacroSkill:
                 prompt = f"Alexa, run FOMC {scenario_slot} shock test"
             elif intent_name == "NvdaDangerZoneIntent":
                 prompt = "Alexa, check if Nvidia is in the Danger Zone"
+            elif intent_name == "MorningBriefIntent":
+                prompt = "Alexa, give me my morning brief"
             elif intent_name == "EquityReportIntent":
                 ticker_slot = intent.get("slots", {}).get("Ticker", {}).get("value", "AAPL")
                 prompt = f"Alexa, give me an equity report on {ticker_slot}"
