@@ -9,6 +9,8 @@ in the same style as the Alexa+ add-on assets (addon-package/make_assets.py). Ne
   store/icon-114.png          114x114   Appstore listing: small icon
   store/firetv-icon-1280x720.png        Appstore listing: Fire TV app icon (tile)
   store/firetv-background-1920x1080.png Appstore listing: Fire TV background image
+  store/featured-logo-640x260.png       Appstore listing: featured content logo (transparent)
+  store/featured-background-1920x720.png Appstore listing: featured content background
 Screenshots (1920x1080) must be real captures from a device/emulator, e.g.:
   adb shell screencap -p /sdcard/s1.png && adb pull /sdcard/s1.png
 """
@@ -46,6 +48,31 @@ def wide(w: int, h: int, tagline: bool) -> Image.Image:
     return img.resize((w, h), Image.LANCZOS) if s > 1 else img
 
 
+def featured_logo(w: int = 640, h: int = 260) -> Image.Image:
+    """Trend motif + wordmark on a transparent canvas; Fire TV overlays it on the featured background."""
+    s = 2
+    img = Image.new("RGBA", (w * s, h * s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    H = h * s
+    trend(d, (int(H * 0.08), int(H * 0.28), int(H * 0.92), int(H * 0.72)), width=int(H * 0.05), dot=int(H * 0.045))
+    x, room = int(H * 1.05), w * s * 0.97 - H * 1.05
+    size = int(H * 0.36)
+    while d.textlength("MacroPulse", font=font(FONT_BOLD, size)) > room:
+        size -= 1
+    f = font(FONT_BOLD, size)
+    top, bottom = d.textbbox((0, 0), "MacroPulse", font=f)[1::2]
+    d.text((x, (H - (bottom - top)) // 2 - top), "MacroPulse", font=f, fill=WHITE)
+    return img.resize((w, h), Image.LANCZOS)
+
+
+def featured_background(w: int = 1920, h: int = 720) -> Image.Image:
+    """Wide, text-free backdrop (the logo is drawn over it): gradient with the trend motif on the right."""
+    img = gradient(w, h)
+    trend(ImageDraw.Draw(img), (int(w * 0.55), int(h * 0.22), int(w * 0.93), int(h * 0.78)),
+          width=int(h * 0.03), dot=int(h * 0.025))
+    return img
+
+
 def main() -> None:
     (HERE / "assets").mkdir(exist_ok=True)
     (HERE / "store").mkdir(exist_ok=True)
@@ -55,6 +82,8 @@ def main() -> None:
     icon(114).save(HERE / "store/icon-114.png", optimize=True)
     wide(1280, 720, tagline=False).save(HERE / "store/firetv-icon-1280x720.png", optimize=True)
     wide(1920, 1080, tagline=True).save(HERE / "store/firetv-background-1920x1080.png", optimize=True)
+    featured_logo().save(HERE / "store/featured-logo-640x260.png", optimize=True)
+    featured_background().save(HERE / "store/featured-background-1920x720.png", optimize=True)
     for p in sorted([*HERE.glob("assets/*.png"), *HERE.glob("store/*.png")]):
         print(p.relative_to(HERE), Image.open(p).size)
 
