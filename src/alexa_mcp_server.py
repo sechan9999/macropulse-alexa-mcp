@@ -2,7 +2,7 @@
 src/alexa_mcp_server.py
 ─────────────────────────────────────────────────────────────────
 MacroPulse Model Context Protocol (MCP) Server for Alexa+
-Serves Streamable HTTP (/mcp) and legacy SSE (/sse) and exposes 8 MCP tools:
+Serves Streamable HTTP (/mcp) and legacy SSE (/sse) and exposes 9 MCP tools:
 
   1. get_macro_regime(): Risk-On/Neutral/Risk-Off regime from a stress z-score
   2. get_rates_and_spreads(): 10Y yield, 10Y-3M curve slope, VIX-derived credit-spread proxy
@@ -13,6 +13,8 @@ Serves Streamable HTTP (/mcp) and legacy SSE (/sse) and exposes 8 MCP tools:
   7. simulate_fomc_shock(scenario): multi-asset FOMC rate-shock stress test
   8. get_equity_report(ticker): regime-weighted DCF fair value, rating, levels and pattern screen for a
      US 10-K filer (headline numbers only; the Excel/Word/HTML files live in the Streamlit Equity Report tab)
+  9. get_morning_brief(): pre-market brief for an Alexa Routine (S&P close, regime, rates, SPY signal,
+     latest daily scan leaders)
 
 Market data comes through a TTL cache with background refresh (see the data layer below).
 If live data cannot be fetched the tools raise MarketDataUnavailable; they never answer
@@ -40,7 +42,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from datetime import datetime, date
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -561,6 +563,131 @@ def execute_ask_macro_analyst(query: str) -> Dict[str, Any]:
 
 
 # ══════════════════════════════════════════════════════════════════
+# MORNING BRIEF: one ~30 s answer for an Alexa Routine ("Alexa, good morning")
+# ══════════════════════════════════════════════════════════════════
+
+_SIGNALS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "signals")
+_SIGNALS_MAX_AGE_DAYS = 4          # a weekend + a holiday; older scans are left out of the brief
+_SIGNAL_ROW = re.compile(r"^\s*·\s*([A-Z0-9.\-^]{1,12})\s+\$[\d,.]+\s+score\s+([+-]\d+)")
+
+
+def _latest_signal_leaders(signals_dir: Optional[str] = None, today: Optional[date] = None,
+                           top: int = 3) -> Optional[Dict[str, Any]]:
+    """Top BUY / SELL names from the newest daily scan (signals/YYYY-MM-DD.md written by the
+    daily-quant-signal workflow), or None when there is no scan from the last few days."""
+    signals_dir = signals_dir or _SIGNALS_DIR
+    try:
+        dated = sorted(f for f in os.listdir(signals_dir) if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.md", f))
+    except OSError:
+        return None
+    if not dated:
+        return None
+    scan_day = date.fromisoformat(dated[-1][:-3])
+    if ((today or date.today()) - scan_day).days > _SIGNALS_MAX_AGE_DAYS:
+        return None
+    buy, sell, side = [], [], None
+    with open(os.path.join(signals_dir, dated[-1]), encoding="utf-8") as fh:
+        for line in fh:
+            if "BUY" in line and "·" not in line:
+                side = buy
+            elif "SELL" in line and "·" not in line:
+                side = sell
+            elif side is not None:
+                m = _SIGNAL_ROW.match(line)
+                if m:
+                    side.append({"ticker": m.group(1), "score": int(m.group(2))})
+    if not buy and not sell:
+        return None
+    sell.sort(key=lambda r: r["score"])            # most negative first
+    return {"scan_date": scan_day.isoformat(), "buy": buy[:top], "sell": sell[:top]}
+
+
+_CURVE_WORDS = {"inverted": "inverted", "un-inverting / flat": "flat", "steep / normal": "normally sloped"}
+
+
+def _say_list(names: List[str]) -> str:
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
+def execute_get_morning_brief() -> Dict[str, Any]:
+    """Pre-market brief built from the other tools' cached data: last S&P 500 close and day change,
+    macro regime, 10Y yield and curve, SPY quant signal, and the latest daily scan's leaders.
+
+    The regime and rates are required (MarketDataUnavailable otherwise); the S&P day change, the SPY
+    signal and the scan leaders are optional and are simply left out, and listed in
+    sections_skipped, when unavailable. Nothing is filled in with made-up numbers.
+    """
+    regime = execute_get_macro_regime()
+    rates = execute_get_rates_and_spreads()
+    skipped: List[str] = []
+
+    close, change_pct, as_of = None, None, None
+    try:
+        raw = _cached_download("^GSPC", "3y", timeout=10)
+        c = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
+        if isinstance(c, pd.DataFrame):
+            c = c.iloc[:, 0]
+        c = c.dropna()
+        close, change_pct = float(c.iloc[-1]), float(c.iloc[-1] / c.iloc[-2] - 1) * 100
+        as_of = pd.Timestamp(c.index[-1]).date()
+    except (MarketDataUnavailable, IndexError, KeyError) as e:
+        logger.warning("Morning brief: S&P day change unavailable: %s", e)
+        skipped.append("sp500_day_change")
+
+    spy = None
+    try:
+        q = execute_scan_quant_signals("SPY")
+        spy = {"signal": q["signal"], "conviction_score": q["conviction_score"], "bb_squeeze_active": q["bb_squeeze_active"]}
+    except MarketDataUnavailable as e:
+        logger.warning("Morning brief: SPY signal unavailable: %s", e)
+        skipped.append("spy_signal")
+
+    leaders = _latest_signal_leaders()
+    if leaders is None:
+        skipped.append("scan_leaders")
+
+    reg_name = regime["regime"].split()[0]
+    parts = ["Here is your MacroPulse market brief"
+             + (f" as of the {as_of:%A, %B} {as_of.day} close." if as_of else ".")]
+    if close is not None:
+        parts.append(f"The S&P 500 closed at {close:,.0f}, {'up' if change_pct >= 0 else 'down'} "
+                     f"{abs(change_pct):.1f} percent.")
+    parts.append(f"The market regime is {reg_name}, with a stress score of {regime['stress_score']}.")
+    slope = rates["curve_slope_bps"]
+    parts.append(f"The 10-year Treasury yields {rates['treasury_10y']} percent, and the curve is "
+                 f"{_CURVE_WORDS.get(rates['curve_status'], rates['curve_status'])} at {slope:+.0f} basis points.")
+    if spy:
+        parts.append(f"SPY's quant signal is {spy['signal'].replace('_', ' ').lower()} with a conviction score of "
+                     f"{spy['conviction_score']:+d}" + (", and a volatility squeeze is active." if spy["bb_squeeze_active"] else "."))
+    if leaders:
+        bits = []
+        if leaders["buy"]:
+            bits.append(f"{_say_list([r['ticker'] for r in leaders['buy']])} on the buy side")
+        if leaders["sell"]:
+            bits.append(f"{_say_list([r['ticker'] for r in leaders['sell']])} on the sell side")
+        parts.append("The latest daily scan favors " + ", and ".join(bits) + ".")
+    parts.append("This is information, not investment advice.")
+
+    return {
+        "status": "success",
+        "as_of": as_of.isoformat() if as_of else None,
+        "sp500_close": round(close, 2) if close is not None else None,
+        "sp500_change_pct": round(change_pct, 2) if change_pct is not None else None,
+        "regime": regime["regime"],
+        "stress_score": regime["stress_score"],
+        "vix": regime["vix"],
+        "treasury_10y": rates["treasury_10y"],
+        "curve_slope_bps": slope,
+        "curve_status": rates["curve_status"],
+        "spy_signal": spy,
+        "signal_leaders": leaders,
+        "sections_skipped": skipped,
+        **_data_freshness(*_MACRO_SERIES.values(), ("^IRX", "1mo"), ("^GSPC", "3y"), ("SPY", "1y")),
+        "alexa_spoken_response": " ".join(parts),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════
 # WARM-UP: keep the default data fresh so requests never wait on Yahoo
 # ══════════════════════════════════════════════════════════════════
 
@@ -647,7 +774,7 @@ def _warm_up_data() -> None:
     _refresh_warm_set()
     for fn in (execute_simulate_fomc_shock, execute_get_macro_regime, execute_get_rates_and_spreads,
                execute_simulate_portfolio_risk, execute_check_nvda_danger_zone,
-               execute_scan_quant_signals, execute_get_expected_returns):
+               execute_scan_quant_signals, execute_get_expected_returns, execute_get_morning_brief):
         try:
             fn()
         except Exception as e:
@@ -722,6 +849,10 @@ def create_mcp_server() -> FastMCP:
     @server.tool(name="get_expected_returns", description="Get 12-month forward S&P 500 expected return forecasts generated by expanding-window Ridge regression.")
     def tool_exp_returns() -> Dict[str, Any]:
         return execute_get_expected_returns()
+
+    @server.tool(name="get_morning_brief", description="Pre-market MacroPulse brief in one short answer (built for an Alexa Routine such as 'Alexa, good morning'): last S&P 500 close and day change, macro regime and stress score, 10Y yield and curve slope, SPY quant signal, and the latest daily scan's top buy/sell names.")
+    def tool_morning_brief() -> Dict[str, Any]:
+        return execute_get_morning_brief()
 
     @server.tool(name="get_equity_report", description="Equity research headline for a US stock (10-K filer): regime-weighted DCF fair value, bear/base/bull scenarios, rule-based rating, stop and targets with 6-month touch probabilities, and the daily candlestick/indicator screen. The full Excel model, Word note and dashboard are in the MacroPulse Equity Report tab (report_url).")
     def tool_equity_report(ticker: str = "AAPL") -> Dict[str, Any]:

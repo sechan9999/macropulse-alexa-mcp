@@ -2543,7 +2543,7 @@ with tab12:
       </div>
       <div style="display:flex; align-items:center; gap: 8px;">
         <b style="color:#f8fafc; font-size:0.9rem;">Tools Registered:</b>
-        <span style="background:rgba(56,189,248,0.15); color:#38bdf8; padding:2px 8px; border-radius:4px; font-weight:600; font-size:0.8rem;">8 Active</span>
+        <span style="background:rgba(56,189,248,0.15); color:#38bdf8; padding:2px 8px; border-radius:4px; font-weight:600; font-size:0.8rem;">9 Active</span>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2560,7 +2560,7 @@ with tab12:
     st.markdown("#### 🗣️ Spoken Voice Prompt Simulation")
     st.caption("Click a preset voice invocation or type a custom command as if speaking to Alexa+ on your Echo or Fire TV:")
 
-    col_p1, col_p2, col_p3, col_p4, col_p5, col_p6 = st.columns(6)
+    col_p1, col_p2, col_p3, col_p4, col_p5, col_p6, col_p7 = st.columns(7)
     preset_prompt = None
 
     with col_p1:
@@ -2581,6 +2581,9 @@ with tab12:
     with col_p6:
         if st.button("📑 'AAPL Report'", use_container_width=True):
             preset_prompt = "Alexa, give me an equity report on AAPL"
+    with col_p7:
+        if st.button("🌅 'Morning Brief'", use_container_width=True):
+            preset_prompt = "Alexa, ask MacroPulse for my morning brief"
 
     # Input prompt text
     default_text = preset_prompt if preset_prompt else "Alexa, what is today's market regime?"

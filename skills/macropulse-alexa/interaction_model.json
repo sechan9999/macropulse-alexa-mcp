@@ -113,6 +113,23 @@
             "show the {Ticker} report on the TV",
             "what is the price target for {Ticker}"
           ]
+        },
+        {
+          "name": "MorningBriefIntent",
+          "slots": [],
+          "samples": [
+            "for my morning brief",
+            "give me my morning brief",
+            "my morning brief",
+            "morning brief",
+            "for the market brief",
+            "give me the market brief",
+            "what's the market brief",
+            "for a market update",
+            "catch me up on the markets",
+            "brief me on the markets",
+            "good morning"
+          ]
         }
       ],
       "types": [

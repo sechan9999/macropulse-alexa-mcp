@@ -66,6 +66,15 @@ Connects Alexa+ to MacroPulse's 11 quantitative analytical modules, bridging ret
   * *"Alexa, what is the fair value of NVDA?"*
   * *"Alexa, show the Microsoft report on the TV."*
 
+### 8. `get_morning_brief`
+* **Parameters**: none.
+* **Description**: One ~30-second pre-market answer built for an Alexa Routine: last S&P 500 close and day change, macro regime and stress score, 10Y yield and curve slope, SPY quant signal, and the top buy/sell names from the latest daily quant-signal scan (`signals/`, skipped when older than 4 days). The regime and rates are required; the other parts are left out (listed in `sections_skipped`) rather than guessed when unavailable.
+* **Alexa Routine setup**: Alexa app → More → Routines → + → When: *Alexa Says* "good morning" (or a schedule, e.g. weekdays 8:00) → Add action → *Custom* → type `ask MacroPulse for my morning brief`. (A *Skills* action opens MacroPulse with a launch request instead, which only greets.)
+* **Sample Voice Invocations**:
+  * *"Alexa, ask MacroPulse for my morning brief."*
+  * *"Alexa, ask MacroPulse to catch me up on the markets."*
+  * *"Alexa, show the morning brief on the TV."*
+
 ## Architecture & Transport
 * **Streamable HTTP Endpoint**: `http://localhost:8000/mcp`
 * **SSE Endpoint**: `http://localhost:8000/sse`
