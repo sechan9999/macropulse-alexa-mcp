@@ -783,15 +783,22 @@ st.markdown("---")
 # ══════════════════════════════════════════
 # TABS
 # ══════════════════════════════════════════
-if st.query_params.get("ticker"):
-    st.info(f"📑 Equity report for **{st.query_params['ticker'].upper()}** is being built in the "
-            "**📑 Equity Report** tab (last tab).")
-
-tab1,tab2,tab3,tab4,tab5,tab6,tab7,tab8,tab9,tab10,tab11,tab12,tab13,tab14 = st.tabs([
+TAB_LABELS = [
     "📈 Performance","🌍 Macro & Rates","🔍 Regime","🤖 Expected Returns",
     "📊 Screener","📉 Technical","🎲 Risk Sim","✨ AI Analyst",
     "🔥 NVDA Danger Zone","📊 Strategy Backtest","🎯 Quant Signals","🎙️ Alexa+ Copilot",
-    "🏦 Multi-Asset Sync & FOMC Shock","📑 Equity Report"])
+    "🏦 Multi-Asset Sync & FOMC Shock","📑 Equity Report"]
+# ?ticker=GOOGL (Buy Zone links, Alexa/MCP report_url) opens straight on the Equity Report tab, where the
+# report is generated on arrival. st.tabs(default=...) needs a recent Streamlit; older ones get a pointer.
+_deeplink = st.query_params.get("ticker")
+try:
+    _tabs = st.tabs(TAB_LABELS, default="📑 Equity Report" if _deeplink else None)
+except TypeError:
+    if _deeplink:
+        st.info(f"📑 Equity report for **{_deeplink.upper()}** is being built in the "
+                "**📑 Equity Report** tab (last tab).")
+    _tabs = st.tabs(TAB_LABELS)
+tab1,tab2,tab3,tab4,tab5,tab6,tab7,tab8,tab9,tab10,tab11,tab12,tab13,tab14 = _tabs
 
 # ─── Tab 1: Performance ──────────────────────────────────────────────
 with tab1:
