@@ -19,6 +19,8 @@ Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, 
 * **Streamlit Community Cloud**: [https://hf-macro-dashboard.streamlit.app/](https://hf-macro-dashboard.streamlit.app/)
 * **GitHub Repository**: [https://github.com/sechan9999/hf-macro-dashboard](https://github.com/sechan9999/hf-macro-dashboard)
 
+> **Where to make changes:** open PRs in [macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp). Every push to its `main` is mirrored into `hf-macro-dashboard` (the repo Streamlit Cloud deploys) by `.github/workflows/sync-hf-dashboard.yml` — one-way, `signals/` excluded, so code edited directly in `hf-macro-dashboard` is overwritten on the next sync. Needs the Actions secret `HF_DASHBOARD_PUSH_TOKEN` (fine-grained PAT, Contents: read & write on `hf-macro-dashboard`).
+
 
 ---
 

@@ -1,0 +1,73 @@
+name: Sync to hf-macro-dashboard
+
+# Streamlit Cloud deploys https://hf-macro-dashboard.streamlit.app from sechan9999/hf-macro-dashboard,
+# while PRs land here. Every push to main mirrors the code over (one-way, signals/ excluded) so the
+# deployed app never falls behind again.
+#
+# One-time setup: a fine-grained personal access token with "Contents: Read and write" on
+# sechan9999/hf-macro-dashboard only, saved in THIS repo as the Actions secret HF_DASHBOARD_PUSH_TOKEN.
+# (The built-in GITHUB_TOKEN cannot push to another repository.)
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "signals/**"          # the daily signal bot's snapshots are per-repo
+  workflow_dispatch:           # "Run workflow" button for a manual re-sync
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-hf-dashboard
+  cancel-in-progress: false    # queue syncs so none is skipped
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the push token is configured
+        env:
+          TOKEN: ${{ secrets.HF_DASHBOARD_PUSH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Secret HF_DASHBOARD_PUSH_TOKEN is not set. Create a fine-grained PAT with Contents: Read and write on sechan9999/hf-macro-dashboard and add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Check out macropulse-alexa-mcp
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Check out hf-macro-dashboard
+        uses: actions/checkout@v4
+        with:
+          repository: sechan9999/hf-macro-dashboard
+          ref: main
+          token: ${{ secrets.HF_DASHBOARD_PUSH_TOKEN }}
+          path: dest
+
+      - name: Mirror code and push
+        working-directory: dest
+        env:
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          ../source/scripts/sync_hf_dashboard.sh ../source .
+          if git diff --cached --quiet; then
+            echo "hf-macro-dashboard is already in sync with ${SHA::7}."
+            exit 0
+          fi
+          git diff --cached --stat
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Sync from macropulse-alexa-mcp@${SHA::7}" \
+                        -m "Source: https://github.com/${REPO}/commit/${SHA}"
+          # The destination's own signal bot may push in between; its commits only touch signals/,
+          # which this sync never writes, so a rebase cannot conflict.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then exit 0; fi
+            git pull -q --rebase origin main
+          done
+          echo "::error::Push to hf-macro-dashboard failed after 3 attempts."
+          exit 1
