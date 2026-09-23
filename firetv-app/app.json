@@ -4,12 +4,19 @@
       [
         "@react-native-tvos/config-tv",
         {
-          "isTV": true
+          "isTV": true,
+          "androidTVBanner": "./assets/tv-banner.png"
         }
       ]
     ],
-    "name": "MacroPulseTV",
+    "name": "MacroPulse",
     "slug": "MacroPulseTV",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "com.macropulse.firetv",
+      "versionCode": 1
+    }
   }
 }

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {Header} from '../components';
 import {
+  DEFAULT_API_BASE_URL,
   getApiBaseUrl,
   setApiBaseUrl,
   getUserId,
@@ -40,14 +41,15 @@ const SettingsScreen = () => {
       <View style={styles.content}>
         <Text style={styles.label}>Macro Pulse API URL</Text>
         <Text style={styles.hint}>
-          rest_server.py's base URL. Use 10.0.2.2 for the host machine from an
-          Android emulator, or your Cloud Run URL for the deployed API.
+          Leave empty for the public MacroPulse service. For local development
+          use rest_server.py, e.g. http://10.0.2.2:8080 from an Android
+          emulator.
         </Text>
         <TextInput
           style={styles.input}
           value={apiBaseUrl}
           onChangeText={setApiBaseUrlInput}
-          placeholder="http://10.0.2.2:8080"
+          placeholder={DEFAULT_API_BASE_URL}
           placeholderTextColor="#64748b"
           autoCapitalize="none"
           autoCorrect={false}

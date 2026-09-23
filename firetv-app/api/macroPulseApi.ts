@@ -8,10 +8,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_BASE_URL_KEY = 'macropulse.apiBaseUrl';
 const USER_ID_KEY = 'macropulse.userId';
 
-// Sensible dev default: 10.0.2.2 is the Android emulator's alias for the
-// host machine's localhost. Replace with your rest_server.py's real
-// LAN/Cloud Run URL on Settings once you're running on an actual device.
-const DEFAULT_API_BASE_URL = 'http://10.0.2.2:8080';
+// Default: the public MacroPulse deployment on AWS (the same ECS service as the Alexa+ MCP
+// server), which serves the /api/* routes from src/firetv_api.py — so a store install works
+// out of the box. For local development point Settings at rest_server.py instead, e.g.
+// http://10.0.2.2:8080 (the Android emulator's alias for the host machine).
+export const DEFAULT_API_BASE_URL =
+  'https://ma-76bae7709d4340b3ab4733ba644f11e4.ecs.us-east-1.on.aws';
 
 export async function getApiBaseUrl(): Promise<string> {
   const stored = await AsyncStorage.getItem(API_BASE_URL_KEY);

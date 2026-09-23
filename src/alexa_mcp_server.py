@@ -784,6 +784,12 @@ def _warm_up_data() -> None:
             execute_get_equity_report(t)
         except Exception as e:
             logger.warning("Equity report warm-up for %s failed: %s", t, e)
+    try:                                   # Fire TV app's first screen (/api/*)
+        from src import firetv_api
+        for fn in (firetv_api.regime_payload, firetv_api.watchlist_payload, firetv_api.nvda_payload):
+            fn()
+    except Exception as e:
+        logger.warning("Fire TV API warm-up failed: %s", e)
     _warm_done.set()
 
 
@@ -1026,8 +1032,8 @@ _PRIVACY_BODY = f"""<h1>Privacy Policy</h1>
 <h2>What this service is</h2>
 <p>MacroPulse is a read-only information service. It answers questions about market conditions
 (macro regime, rates and spreads, portfolio risk simulations, FOMC scenarios, a pre-market morning brief and
-equity reports on US-listed companies) when an assistant such as Alexa+ calls its tools. It has no user accounts
-and no sign-in.</p>
+equity reports on US-listed companies) when an assistant such as Alexa+ calls its tools, and it serves the same
+read-only market data to the MacroPulse Fire TV app. It has no user accounts and no sign-in.</p>
 <h2>What we receive</h2>
 <ul>
 <li>The tool request itself: the tool name and its arguments, for example a ticker symbol such as <code>SPY</code> or a scenario name.</li>
@@ -1108,6 +1114,42 @@ async def root_endpoint(request):
     })
 
 
+# ── Fire TV companion app API (firetv-app/): same payloads as rest_server.py, served from this
+#    public deployment so the TV app needs no separate backend. Blocking data loads run off the
+#    event loop so they never stall /mcp.
+async def _firetv_json(fn, *args):
+    from starlette.concurrency import run_in_threadpool
+    from src.firetv_api import FireTvDataUnavailable
+    try:
+        return JSONResponse(await run_in_threadpool(fn, *args))
+    except FireTvDataUnavailable as e:
+        return JSONResponse({"detail": str(e)}, status_code=503)
+
+
+async def firetv_health_endpoint(request):
+    return JSONResponse({"status": "ok"})
+
+
+async def firetv_regime_endpoint(request):
+    from src import firetv_api
+    return await _firetv_json(firetv_api.regime_payload)
+
+
+async def firetv_watchlist_endpoint(request):
+    from src import firetv_api
+    q = request.query_params
+    try:
+        top_n = int(q.get("top_n", "5"))
+    except ValueError:
+        return JSONResponse({"detail": "top_n must be an integer"}, status_code=422)
+    return await _firetv_json(firetv_api.watchlist_payload, q.get("user_id", ""), q.get("tickers", ""), top_n)
+
+
+async def firetv_nvda_endpoint(request):
+    from src import firetv_api
+    return await _firetv_json(firetv_api.nvda_payload)
+
+
 async def privacy_endpoint(request):
     return HTMLResponse(_page("Privacy Policy - MacroPulse Alexa+ MCP Server", _PRIVACY_BODY))
 
@@ -1153,6 +1195,10 @@ def build_starlette_app(warm_up: bool = True) -> Starlette:
     fastmcp_server.custom_route("/", methods=["GET"])(root_endpoint)
     fastmcp_server.custom_route("/privacy", methods=["GET"])(privacy_endpoint)
     fastmcp_server.custom_route("/terms", methods=["GET"])(terms_endpoint)
+    fastmcp_server.custom_route("/api/health", methods=["GET"])(firetv_health_endpoint)
+    fastmcp_server.custom_route("/api/regime", methods=["GET"])(firetv_regime_endpoint)
+    fastmcp_server.custom_route("/api/watchlist-signals", methods=["GET"])(firetv_watchlist_endpoint)
+    fastmcp_server.custom_route("/api/nvda-danger", methods=["GET"])(firetv_nvda_endpoint)
 
     if _MCP_V2:
         # Stateless: every tool is a pure function, so no per-session state is needed and
