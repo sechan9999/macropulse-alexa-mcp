@@ -179,6 +179,13 @@ def shares_outstanding(facts: dict) -> float | None:
     return float(s.iloc[-1]) if len(s) else None
 
 
+def latest_annual_filing(facts: dict) -> str:
+    """Filing date of the newest 10-K the fundamentals come from (10-Qs are not used, so not counted)."""
+    usgaap = facts.get("facts", {}).get("us-gaap", {})
+    return max((r.get("filed", "") for tag in (*TAGS["revenue"], *TAGS["net_income"])
+                for r in _rows(usgaap, tag, "USD") if str(r.get("form", "")).startswith(ANNUAL_FORMS)), default="")
+
+
 def eps_by_filing_date(facts: dict) -> pd.Series:
     """Annual diluted EPS indexed by the date it became public (filing date) -> no look-ahead in P/E bands."""
     usgaap = facts.get("facts", {}).get("us-gaap", {})
@@ -275,9 +282,7 @@ def load_bundle(ticker: str, years: int = 3, *, price_fetch: Callable[[str], pd.
     if len(eps):
         eps_asof = eps.reindex(close.index.union(eps.index)).ffill().reindex(close.index)
         pe = close / eps_asof.where(eps_asof > 0)
-    last_filed = max((r.get("filed", "") for tag in ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
-                                                     "NetIncomeLoss")
-                      for r in _rows(facts["facts"]["us-gaap"], tag, "USD")), default="")
+    last_filed = latest_annual_filing(facts)
     return {
         "ticker": ticker, "name": name, "cik": cik, "is_synthetic": False,
         "prices": prices, "index": index, "financials": fin, "shares": shares,
@@ -285,7 +290,7 @@ def load_bundle(ticker: str, years: int = 3, *, price_fetch: Callable[[str], pd.
         "eps_latest": float(eps.iloc[-1]) if len(eps) else None,
         "positioning": positioning(ticker) if with_positioning else None,
         "risk_free_live": risk_free,
-        "sources": ["Yahoo Finance (prices)", f"SEC EDGAR XBRL 10-K (CIK {cik}, latest filing {last_filed})"],
+        "sources": ["Yahoo Finance (prices)", f"SEC EDGAR XBRL 10-K (CIK {cik}, latest 10-K filed {last_filed})"],
         "as_of": str(prices.index[-1].date()),
         "fetched_at": datetime.now().isoformat(timespec="seconds"),
     }

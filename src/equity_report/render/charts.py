@@ -43,6 +43,18 @@ def _dodge(items, gap):
     return out
 
 
+def latest_signal_labels(sig: pd.DataFrame, pos: dict, n: int = 2) -> list[tuple[int, str, str]]:
+    """One label per direction for the n most recent signals, so nearby same-side labels never overlap:
+    [(bar index of the latest one, "Hanging Man ×2" / "Doji · Hanging Man", direction), ...]."""
+    last = sig[sig["date"].isin(pos)].sort_values("date").tail(n)
+    out = []
+    for direction, g in last.groupby("direction", sort=False):
+        counts = g["name"].value_counts(sort=False)
+        text = " · ".join(f"{nm} ×{c}" if c > 1 else nm for nm, c in counts.items())
+        out.append((pos[g["date"].iloc[-1]], text, direction))
+    return out
+
+
 def price_chart_png(ind: pd.DataFrame, screen: dict, sr: dict, label: str, title: str) -> bytes:
     n = WINDOW.get(label, 126)
     d = ind.iloc[-n:]
@@ -90,13 +102,10 @@ def price_chart_png(ind: pd.DataFrame, screen: dict, sr: dict, label: str, title
             ax.scatter(i, d["low"].iloc[i] - pad * 0.35, marker="^", s=60, color=UP, zorder=5, edgecolor="white", lw=1)
         elif r["direction"] == "bear":
             ax.scatter(i, d["high"].iloc[i] + pad * 0.35, marker="v", s=60, color=DOWN, zorder=5, edgecolor="white", lw=1)
-    for _, r in sig.sort_values("date").tail(2).iterrows():
-        i = pos.get(r["date"])
-        if i is None:
-            continue
-        yv = d["low"].iloc[i] - pad * 0.9 if r["direction"] == "bull" else d["high"].iloc[i] + pad * 0.9
+    for i, text, direction in latest_signal_labels(sig, pos):
+        yv = d["low"].iloc[i] - pad * 0.9 if direction == "bull" else d["high"].iloc[i] + pad * 0.9
         ha = "right" if i > len(d) * 0.8 else "left" if i < len(d) * 0.2 else "center"
-        ax.annotate(r["name"], (i, yv), ha=ha, fontsize=10, color=INK,
+        ax.annotate(text, (i, yv), ha=ha, fontsize=10, color=INK,
                     bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="#bdbcb6", lw=0.8))
     ax.set_ylim(lo - pad * 1.3, hi + pad * 1.3)
     for y0, y1, t, c in _dodge(labels, (hi - lo + 2.6 * pad) * 0.06):
@@ -112,13 +121,13 @@ def price_chart_png(ind: pd.DataFrame, screen: dict, sr: dict, label: str, title
     axm.plot(x, d["macd"], color=INK, lw=1.3, label="MACD")
     axm.plot(x, d["signal"], color=SERIES[1], lw=1.3, label="Signal")
     axm.axhline(0, color="#9a9994", lw=0.7)
-    axm.legend(loc="upper left", fontsize=9, frameon=False, ncol=2)
+    axm.legend(loc="upper left", fontsize=9, ncol=2, frameon=True, facecolor="white", framealpha=0.9, edgecolor="none")
     axk.plot(x, d["k"], color=INK, lw=1.3, label="%K")
     axk.plot(x, d["d"], color=SERIES[1], lw=1.3, label="%D")
     for lvl in (80, 20):
         axk.axhline(lvl, color="#9a9994", lw=0.7, ls="--")
     axk.set_ylim(0, 100)
-    axk.legend(loc="upper left", fontsize=9, frameon=False, ncol=2)
+    axk.legend(loc="upper left", fontsize=9, ncol=2, frameon=True, facecolor="white", framealpha=0.9, edgecolor="none")
     for a in (ax, axv, axm, axk):
         _style(a)
         a.set_xlim(-1, len(d) + 0.5)
