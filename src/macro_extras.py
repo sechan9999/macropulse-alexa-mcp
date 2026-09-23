@@ -226,22 +226,44 @@ def fetch_nvda_full(period_days: int = 365):
         labels=["Safe Zone 🟢", "Caution ⚠️", "Danger Zone 🔴"]
     ).astype(str)
 
-    peers = {"NVDA": "NVDA", "SOX": "SOXX", "AMD": "AMD", "TSM": "TSM", "AVGO": "AVGO", "MU": "MU"}
-    ctx_frames = {}
-    for name, tkr in peers.items():
-        try:
-            raw = yf.download(tkr, period=f"{period_days}d", auto_adjust=True, progress=False,
-                               multi_level_index=False)["Close"]
-            if isinstance(raw, pd.DataFrame):
-                raw = raw.iloc[:, 0]
-            raw.index = pd.to_datetime(raw.index).tz_localize(None)
-            ctx_frames[name] = raw
-        except Exception:
-            pass
-    df_ctx = pd.DataFrame(ctx_frames).ffill().dropna()
-    df_ctx = df_ctx / df_ctx.iloc[0] * 100 if not df_ctx.empty else df_ctx
+    return df, fetch_peer_context(period_days)
 
-    return df, df_ctx
+
+NVDA_PEERS = {"NVDA": "NVDA", "SOX": "SOXX", "AMD": "AMD", "TSM": "TSM", "AVGO": "AVGO", "MU": "MU"}
+MAX_PLAUSIBLE_DAILY_MOVE = 0.40      # a large cap moving >40% in one session is almost always bad data
+
+
+def clean_peer_series(close: pd.Series, max_daily_move: float = MAX_PLAUSIBLE_DAILY_MOVE) -> bool:
+    """True when a close series looks like one ticker's real history (no single-day jump beyond
+    `max_daily_move`). A spliced or mixed-up series (another ticker's prices, unadjusted splits)
+    shows up as such a jump and would turn into absurd 1-year returns like +1,400%."""
+    r = close.dropna().pct_change().dropna()
+    return bool(len(r)) and float(r.abs().max()) <= max_daily_move
+
+
+def fetch_peer_context(period_days: int = 365, peers: dict | None = None) -> pd.DataFrame:
+    """NVDA and AI peers indexed to 100 at the first common date.
+
+    Each ticker is fetched with its own yf.Ticker(...).history() — yf.download() keeps results in a
+    module-level dict shared by every thread, so concurrent Streamlit sessions can receive another
+    ticker's prices. Series that fail clean_peer_series() are left out; their names are listed in
+    df.attrs["excluded"] so the UI can say so instead of showing a made-up return."""
+    frames, excluded = {}, []
+    for name, tkr in (peers or NVDA_PEERS).items():
+        try:
+            raw = yf.Ticker(tkr).history(period=f"{period_days}d", auto_adjust=True)["Close"]
+            raw.index = pd.to_datetime(raw.index).tz_localize(None).normalize()
+        except Exception:
+            excluded.append(name)
+            continue
+        if clean_peer_series(raw):
+            frames[name] = raw
+        else:
+            excluded.append(name)
+    df_ctx = pd.DataFrame(frames).ffill().dropna()
+    df_ctx = df_ctx / df_ctx.iloc[0] * 100 if not df_ctx.empty else df_ctx
+    df_ctx.attrs["excluded"] = excluded
+    return df_ctx
 
 
 def summarize_nvda_danger_zone(period_days: int = 365) -> dict:

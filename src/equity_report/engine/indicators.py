@@ -11,8 +11,16 @@ WINDOW = {"Daily": 126, "Weekly": 52, "Monthly": 36}      # bars shown: 6 months
 
 
 def resample(df: pd.DataFrame, rule: str) -> pd.DataFrame:
-    """Daily -> weekly ('W-FRI') or monthly ('ME') OHLCV."""
-    return df[list(AGG)].resample(rule).agg(AGG).dropna(subset=["close"])
+    """Daily -> weekly ('W-FRI') or monthly ('ME') OHLCV.
+
+    Each bar is labelled with its LAST ACTUAL trading day, not the period end pandas would use:
+    otherwise the unfinished current month shows up as e.g. 2026-09-30 on 2026-09-23, and a cross
+    "on 2026-09-30" reads like a signal from the future."""
+    bars = df[list(AGG)].resample(rule).agg(AGG)
+    bars["_last_day"] = df.index.to_series().resample(rule).last()
+    bars = bars.dropna(subset=["close"])
+    bars.index = pd.DatetimeIndex(bars.pop("_last_day"), name=df.index.name)
+    return bars
 
 
 def macd(close: pd.Series, fast=12, slow=26, signal=9) -> pd.DataFrame:

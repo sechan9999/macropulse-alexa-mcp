@@ -37,7 +37,7 @@ def main() -> int:
                if args.tickers else DEFAULT_UNIVERSE)
 
     try:
-        scan = run_quant_scan(tickers, period=args.period)
+        scan = run_quant_scan(tickers, period=args.period, lang="ko")  # Korean daily report
     except Exception as e:
         print(f"❌ Quant scan failed: {e}", file=sys.stderr)
         return 1
