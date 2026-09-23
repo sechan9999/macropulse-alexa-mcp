@@ -59,7 +59,7 @@ The platform is structured into 13 dedicated analytical tabs, each equipped with
 * Simulates 1,000 to 10,000 forward market paths using geometric Brownian motion and empirical bootstrap modes.
 * Interactive probability fan charts with parametric and empirical Value-at-Risk (**VaR 95% / 99%**) and Conditional Value-at-Risk (**CVaR / Expected Shortfall**).
 
-### 8. ✨ Gemini AI Macro Analyst
+### 8. ✨ AI Macro Analyst
 * Ingests real-time dashboard data (macro regime scores, Treasury yields, credit spreads, drawdown metrics, volatility, momentum).
 * Powered by **Google Gemini 1.5 / 3 Flash** via the unified Google GenAI SDK.
 * Provides institutional briefings across 5 modes:
