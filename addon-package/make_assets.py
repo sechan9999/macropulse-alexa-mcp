@@ -9,14 +9,22 @@ from PIL import Image, ImageDraw, ImageFont
 OUT = Path(__file__).parent / "assets"
 ICON_SIZES = (72, 64, 88, 126, 180, 241)
 NAVY, NAVY2, TEAL, WHITE, MUTED = (12, 24, 43), (22, 42, 72), (45, 212, 191), (240, 245, 252), (152, 168, 192)
-FONT_BOLD, FONT = "C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/segoeui.ttf"
+# First font found wins: Segoe UI on Windows, Liberation Sans / DejaVu Sans on Linux.
+FONT_BOLD = ("C:/Windows/Fonts/segoeuib.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf")
+FONT = ("C:/Windows/Fonts/segoeui.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+# Keep in sync with storeListing.locales.en-US.examplePhrases in addon.json.
+PHRASES = ["What's in my morning brief?", "Equity report on Apple.", "What's the macro regime?"]
 
 
-def font(path: str, size: int) -> ImageFont.FreeTypeFont:
-    try:
-        return ImageFont.truetype(path, size)
-    except OSError:
-        return ImageFont.load_default(size)
+def font(paths: tuple, size: int) -> ImageFont.FreeTypeFont:
+    for path in paths:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+    return ImageFont.load_default(size)
 
 
 def gradient(w: int, h: int) -> Image.Image:
@@ -59,9 +67,8 @@ def carousel() -> Image.Image:
     d.text((44, 148), "Live macro signals,\nspoken.", font=font(FONT, 34), fill=TEAL, spacing=6)
     trend(d, (44, 270, w - 44, 430), width=8, dot=11)
     d.text((44, 470), "TRY SAYING", font=font(FONT_BOLD, 20), fill=MUTED)
-    phrases = ["What's the macro regime?", "Simulate a hawkish Fed shock.", "How risky is SPY right now?"]
     y = 512
-    for p in phrases:
+    for p in PHRASES:
         d.rounded_rectangle((44, y, w - 44, y + 74), radius=16, fill=(30, 54, 90))
         d.text((66, y + 18), f"\u201c{p}\u201d", font=font(FONT, 27), fill=WHITE)
         y += 92
