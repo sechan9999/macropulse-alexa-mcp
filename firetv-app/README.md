@@ -45,7 +45,8 @@ screens and content components are new.
 npm install --legacy-peer-deps
 ```
 
-`--legacy-peer-deps` is required — `react-native-tvos`'s prerelease-style
+`--legacy-peer-deps` is required (it is also set in `firetv-app/.npmrc`, which EAS Build
+reads — without it the cloud build fails at "Install dependencies" with ERESOLVE) — `react-native-tvos`'s prerelease-style
 version string (`0.74.2-0`) doesn't satisfy some packages' semver peer
 ranges even though it's ABI-compatible with the react-native version they
 expect. This is a known, common `react-native-tvos` ecosystem quirk, not
