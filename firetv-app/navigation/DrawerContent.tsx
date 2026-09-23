@@ -8,7 +8,7 @@ import {Animated, StyleSheet} from 'react-native';
 import {TVFocusGuideView, useTVEventHandler} from 'react-native';
 import DrawerItem from './DrawerItem';
 
-const COLLAPSED_WIDTH = 60;
+export const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 170;
 const ANIMATION_DURATION = 300;
 

@@ -6,9 +6,10 @@ interface StatTileProps {
   value: string;
   delta?: string;
   deltaPositive?: boolean;
+  deltaColor?: string; // overrides the green/red deltaPositive colouring
 }
 
-const StatTile = ({label, value, delta, deltaPositive}: StatTileProps) => {
+const StatTile = ({label, value, delta, deltaPositive, deltaColor}: StatTileProps) => {
   return (
     <View style={styles.tile}>
       <Text style={styles.label}>{label}</Text>
@@ -17,7 +18,7 @@ const StatTile = ({label, value, delta, deltaPositive}: StatTileProps) => {
         <Text
           style={[
             styles.delta,
-            {color: deltaPositive ? '#34d399' : '#f87171'},
+            {color: deltaColor ?? (deltaPositive ? '#34d399' : '#f87171')},
           ]}>
           {delta}
         </Text>

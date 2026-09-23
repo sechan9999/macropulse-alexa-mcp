@@ -17,6 +17,10 @@ import {
   NvdaDangerResponse,
 } from '../api/macroPulseApi';
 
+// Colour of the danger-index line follows the zone (see macro_extras.py danger_label).
+const dangerColor = (label: string) =>
+  label.startsWith('Danger') ? '#f87171' : label.startsWith('Caution') ? '#fbbf24' : '#34d399';
+
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes — glanceable, not real-time
 
 const HomeScreen = () => {
@@ -102,6 +106,7 @@ const HomeScreen = () => {
                 label={nvda.danger_label}
                 value={`$${nvda.price.toFixed(2)}`}
                 delta={`danger index ${nvda.danger_index?.toFixed(2) ?? '—'}`}
+                deltaColor={dangerColor(nvda.danger_label ?? '')}
               />
             </View>
           ) : null}

@@ -9,7 +9,7 @@ import {
   DrawerContentComponentProps,
 } from '@react-navigation/drawer';
 import {HomeScreen, SettingsScreen} from '../screens';
-import DrawerContent from './DrawerContent';
+import DrawerContent, {COLLAPSED_WIDTH} from './DrawerContent';
 
 const Drawer = createDrawerNavigator();
 
@@ -27,6 +27,9 @@ const LeftHandNav = () => {
           width: 'auto',
         },
         headerShown: false,
+        // The drawer is absolutely positioned over the screen (so it can
+        // expand over it); reserve its collapsed width so it never hides content.
+        sceneContainerStyle: {marginLeft: COLLAPSED_WIDTH},
       }}>
       <Drawer.Screen name="Home" component={HomeScreen} />
       <Drawer.Screen name="Settings" component={SettingsScreen} />
