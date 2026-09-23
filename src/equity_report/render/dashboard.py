@@ -40,6 +40,8 @@ table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font
 th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}th{color:var(--ink2);font-weight:600}.scroll{overflow-x:auto}
 .sens td{text-align:center}.sens td.hl{outline:2px solid var(--gold);outline-offset:-2px;font-weight:700}
+.fomc{display:inline-block;margin-left:4px;padding:0 5px;border-radius:6px;background:var(--ink);color:var(--card);
+font-size:10.5px;font-weight:700;vertical-align:1px}
 .chips{display:flex;gap:8px;flex-wrap:wrap}.chip{background:var(--chip);border-radius:999px;padding:4px 12px;font-size:13px}
 .tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}.tabs button{background:transparent;border:1px solid var(--line);
 color:var(--ink2);padding:6px 14px;border-radius:999px;cursor:pointer;font:inherit}
@@ -109,12 +111,28 @@ def _fcf(val) -> go.Figure:
     return fig
 
 
+FOMC_TAGS = {"hawkish_50bps": "H", "dovish_50bps": "D", "stagflation_inversion": "S", "liquidity_cascade": "L"}
+
+
+def fomc_cells(sens, overlay) -> dict:
+    """{(row, col): [tag, ...]} — nearest grid cell for each FOMC scenario inside the grid (±half a step)."""
+    ws, gs = np.array(sens.index, float), np.array(sens.columns, float)
+    half_w, half_g = np.min(np.diff(ws)) / 2 + 1e-9, np.min(np.diff(gs)) / 2 + 1e-9
+    out: dict = {}
+    for x in overlay:
+        i, j = int(np.abs(ws - x["wacc"]).argmin()), int(np.abs(gs - x["terminal_growth"]).argmin())
+        if abs(ws[i] - x["wacc"]) <= half_w and abs(gs[j] - x["terminal_growth"]) <= half_g:
+            out.setdefault((i, j), []).append(FOMC_TAGS[x["scenario"]])
+    return out
+
+
 def _sens(val, price) -> str:
     s = val["sensitivity"]
     vals = s.values
     dev = vals / price - 1
     m = np.nanmax(np.abs(dev)) or 1
     ci, cj = len(s.index) // 2, len(s.columns) // 2
+    tags = fomc_cells(s, val.get("fomc_overlay", []))
     rows = ["<tr><th>WACC \\ g</th>" + "".join(f"<th>{g:.1%}</th>" for g in s.columns) + "</tr>"]
     for i, w in enumerate(s.index):
         tds = []
@@ -122,13 +140,32 @@ def _sens(val, price) -> str:
             x, d = vals[i, j], dev[i, j]
             a = int(min(1, abs(d) / m) * 100) if not np.isnan(d) else 0
             bg = "var(--above)" if d > 0 else "var(--below)"
+            badge = "".join(f'<span class="fomc">{t}</span>' for t in tags.get((i, j), []))
             tds.append(f'<td class="{"hl" if (i, j) == (ci, cj) else ""}" title="{d * 100:+.1f}% vs price" '
-                       f'style="background:color-mix(in srgb,{bg} {a}%,var(--mid))">{_usd(x)}</td>')
+                       f'style="background:color-mix(in srgb,{bg} {a}%,var(--mid))">{_usd(x)}{badge}</td>')
         rows.append(f"<tr><th>{w:.2%}</th>{''.join(tds)}</tr>")
     return (f'<div class="scroll"><table class="sens">{"".join(rows)}</table></div><div class="legend">'
             '<span><i class="sw" style="background:var(--below)"></i>below price</span>'
             '<span><i class="sw" style="background:var(--mid)"></i>near price</span>'
-            '<span><i class="sw" style="background:var(--above)"></i>above price</span><span>outlined = base case</span></div>')
+            '<span><i class="sw" style="background:var(--above)"></i>above price</span><span>outlined = base case</span>'
+            '<span><span class="fomc">H</span><span class="fomc">D</span><span class="fomc">S</span>'
+            '<span class="fomc">L</span> FOMC scenario (table below)</span></div>')
+
+
+def _fomc(val, price) -> str:
+    ov = val.get("fomc_overlay", [])
+    if not ov:
+        return ""
+    body = "".join(
+        f"<tr><td><span class='fomc'>{FOMC_TAGS[x['scenario']]}</span> {html.escape(x['title'])}</td>"
+        f"<td>{x['d_rf'] * 1e4:+.0f} / {x['d_erp'] * 1e4:+.0f} / {x['d_spread'] * 1e4:+.0f} / {x['d_g'] * 1e4:+.0f}</td>"
+        f"<td>{x['wacc']:.2%}</td><td>{x['terminal_growth']:.1%}</td><td>{_usd(x['per_share'])}</td>"
+        f"<td>{_pct(x['upside'])}</td><td>{_pct(x['tab13_price_shock'])}</td></tr>" for x in ov)
+    return ('<h2>FOMC shock overlay (tab 13 scenarios)</h2><div class="card"><div class="scroll"><table><tr><th>Scenario</th><th>Δ rf / ERP / spread / g (bp)</th><th>WACC</th>'
+            f'<th>g</th><th>Value / share</th><th>vs. price</th><th>Tab-13 price shock</th></tr>{body}</table></div>'
+            '<p class="note">Illustrative rate / premium / spread shifts, FCF path fixed. Scenarios outside the '
+            '±1pp grid have no badge. Tab-13 price shock = the hard-coded single-name shock the FOMC tab applies '
+            '(default for tickers it does not list).</p></div>')
 
 
 def _snapshot(ctx) -> str:
@@ -182,7 +219,10 @@ def build(rep: Report, *, theme: str | None = None, offline: bool = False) -> st
             ("Rule-based rating", rb["rating"], f"score {rb['score']:+.1f}"),
             ("WACC · terminal g", f"{v['wacc']:.2%}", f"g {v['terminal_growth']:.1%} · β {v['beta']:.2f}"),
             ("Pattern screen (daily)", rep.screen["overall"], f"bull {rep.screen['bull_score']} : bear {rep.screen['bear_score']}"),
-            ("Target 1 · 6m touch prob.", _usd(lv["target1"]), f"{(lv['touch_prob_6m']['target1'] or 0):.0%} (driftless)"),
+            ("Target 1 · 6m touch prob.", _usd(lv["target1"]),
+             f"{(lv['touch_prob_6m']['target1'] or 0):.0%} "
+             + (f"(Ridge drift, E[R] {ctx['drift']['stock_expected_return']:+.1%})"
+                if ctx["drift"].get("stock_expected_return") is not None else "(driftless)")),
             ("Stop", _usd(lv["stop"]), _pct(lv["stop"] / price - 1))]
     kpi_html = "".join(f'<div class="card kpi"><div class="lab">{a}</div><div class="val">{b}</div><div class="d">{d}</div></div>'
                        for a, b, d in kpis)
@@ -214,6 +254,7 @@ def build(rep: Report, *, theme: str | None = None, offline: bool = False) -> st
 <p class="note">Bear: growth −5pp, FCF margin ×0.8, WACC +1pp · Bull: the reverse. Inputs: risk-free {v['risk_free']:.2%}
 ({html.escape(v['risk_free_source'])}), ERP {v['erp_used']:.2%}, growth {v['growth_high']:.1%} → {v['terminal_growth']:.1%},
 FCF margin {v['fcf_margin']:.1%}, terminal value {v['tv_share_of_ev']:.0%} of EV.</p>{notes}{issues}</div></div></section>
+{_fomc(val, price)}
 <h2>Free cash flow: actual and projected</h2><div class="card">{_div(_fcf(val), 'fcf')}</div>
 <h2>Technical charts</h2><div class="card"><div class="tabs" role="tablist">
 <button role="tab" aria-selected="true" data-t="0">Daily · 6M</button><button role="tab" aria-selected="false" data-t="1">Weekly · 12M</button>

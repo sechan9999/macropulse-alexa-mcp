@@ -24,4 +24,7 @@ class DCFAssumptions:
 
 FALLBACK_RISK_FREE = 0.0425
 
+# Public URL of the Streamlit app: report links (?ticker=...) from MCP / Alexa and the Buy Zone scanner.
+APP_URL = os.getenv("MACROPULSE_APP_URL", "https://hf-macro-dashboard.streamlit.app/")
+
 SEC_USER_AGENT = os.getenv("SEC_USER_AGENT", "MacroPulse equity-report (set SEC_USER_AGENT=name email)")

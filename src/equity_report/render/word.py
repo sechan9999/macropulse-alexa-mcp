@@ -20,6 +20,7 @@ from docx.oxml.ns import nsdecls, qn
 from docx.shared import Cm, Inches, Pt, RGBColor
 
 from ..engine.analysis import Report
+from ..engine.dcf import FOMC_NOTE
 
 FONT, NAVY = "Calibri", "1a1a4e"
 GREEN, RED, GREY = RGBColor(0x16, 0x80, 0x3c), RGBColor(0xC0, 0x1C, 0x1C), RGBColor(0x59, 0x59, 0x59)
@@ -150,7 +151,13 @@ def build(rep: Report, charts: dict[str, bytes]) -> bytes:
                     signed_cols=(2,)),
             D.table(["WACC \\ g"] + [f"{g:.1%}" for g in val["sensitivity"].columns],
                     [[f"{w:.2%}"] + [("-" if np.isnan(x) else f"${x:,.0f}") for x in row]
-                     for w, row in zip(val["sensitivity"].index, val["sensitivity"].values)])),
+                     for w, row in zip(val["sensitivity"].index, val["sensitivity"].values)]),
+            D.table(["FOMC scenario (tab 13)", "WACC", "g", "Value / share", "vs. price", "Tab-13 price shock"],
+                    [[x["title"], f"{x['wacc']:.2%}", f"{x['terminal_growth']:.1%}",
+                      "-" if not np.isfinite(x["per_share"]) else f"${x['per_share']:,.2f}", _pct(x["upside"]),
+                      _pct(x["tab13_price_shock"])] for x in val.get("fomc_overlay", [])],
+                    signed_cols=(4, 5)),
+            D.para(FOMC_NOTE, size=9, color=GREY)),
     }
     lines = (rep.narrative or "").splitlines()
     i, first = 0, True

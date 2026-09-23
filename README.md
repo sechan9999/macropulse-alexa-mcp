@@ -115,9 +115,10 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 * **Valuation**: FCFF-proxy DCF (CFO − CapEx), CAPM with live 10Y yield and Blume-adjusted beta, WACC × g sensitivity, bear/base/bull scenarios, P/E and P/B bands, football-field chart.
 * **Macro-regime overlay**: the dashboard's Risk-On / Neutral / Risk-Off call sets the scenario weights (20/50/30 · 25/50/25 · 40/45/15) and shifts the ERP (−0.25pp / 0 / +0.50pp). The report also shows the neutral-weight value for comparison.
 * **Technicals**: Monthly (3y) / Weekly (12m) / Daily (6m) candles with MACD, slow stochastic (KD), RSI, Bollinger, ADX, support/resistance and a 17-pattern candlestick + indicator screen (`bullish_count`, `bearish_count`, `bull_score`, `bear_score`, `overall`).
+* **Cross-tab links**: target touch probabilities use the drift implied by the Expected Returns tab's Ridge S&P 500 forecast (CAPM; the driftless value is shown alongside), the tab-13 FOMC shock scenarios are overlaid on the WACC × g sensitivity grid (H / D / S / L badges + table, also as live formulas in Excel), and every Buy Zone scanner row links to its report.
 * **Narrative**: rule-based rating first, then optional Gemini / Bedrock text that may only quote numbers from the JSON context.
 * **Alexa+**: "Alexa, give me an equity report on Apple" → spoken summary + Fire TV APL card (scenario footer); new MCP tool `get_equity_report`; the Alexa+ tab shows the same four downloads. Deep link: `?ticker=AAPL`.
-* **Secrets**: set `SEC_USER_AGENT="Your Name you@example.com"` (SEC fair-access policy). Optional: `EQUITY_REPORT_WARM` (tickers prefetched by the MCP server, default `AAPL,MSFT,NVDA,AMZN,GOOGL`).
+* **Secrets**: set `SEC_USER_AGENT="Your Name you@example.com"` (SEC fair-access policy). Optional: `EQUITY_REPORT_WARM` (tickers prefetched by the MCP server, default `AAPL,MSFT,NVDA,AMZN,GOOGL`), `MACROPULSE_APP_URL` (base URL for `?ticker=` report links, default `https://hf-macro-dashboard.streamlit.app/`).
 
 ---
 

@@ -35,6 +35,8 @@ class TestRenderers(unittest.TestCase):
         self.assertIn("SYNTHETIC DEMO DATA", f["html"])
         self.assertIn('data-theme="dark"', f["html_embed"])
         self.assertIn("Risk-Off", f["html"])
+        self.assertIn("FOMC shock overlay", f["html"])
+        self.assertIn('class="fomc"', f["html"])
         names = zipfile.ZipFile(io.BytesIO(f["zip"])).namelist()
         for n in (f["filenames"]["xlsx"], f["filenames"]["docx"], f["filenames"]["html"], "summary.json",
                   "charts/DEMO_daily.png"):
@@ -63,6 +65,21 @@ class TestRenderers(unittest.TestCase):
         sens = [wb["Sensitivity"].cell(r, c).value for r in range(5, 10) for c in range(2, 7)]
         self.assertAlmostEqual(min(sens), v["sensitivity"].values.min(), places=6)
         self.assertAlmostEqual(max(sens), v["sensitivity"].values.max(), places=6)
+        for i, x in enumerate(v["fomc_overlay"]):                     # FOMC overlay block, rows 19-22
+            self.assertAlmostEqual(wb["Sensitivity"][f"F{19 + i}"].value, x["wacc"], places=9)
+            self.assertAlmostEqual(wb["Sensitivity"][f"H{19 + i}"].value, x["per_share"], places=6)
+
+    def test_excel_fomc_block(self):
+        from openpyxl import load_workbook
+        ws = load_workbook(io.BytesIO(self.files["xlsx"]))["Sensitivity"]
+        self.assertEqual(ws["A19"].value, "Hawkish Surprise (+50 bps Hike)")
+        self.assertTrue(str(ws["H19"].value).startswith("=IFERROR((SUMPRODUCT("))
+        self.assertTrue(str(ws["F22"].value).startswith("=Assumptions!$B$24"))
+
+    def test_word_has_fomc_table(self):
+        from docx import Document
+        cells = {c.text for t in Document(io.BytesIO(self.files["docx"])).tables for r in t.rows for c in r.cells}
+        self.assertIn("FOMC scenario (tab 13)", cells)
 
 
 class TestRegimeInputs(unittest.TestCase):
@@ -87,6 +104,14 @@ class TestRegimeInputs(unittest.TestCase):
         self.assertIsNone(reg)
 
 
+def _deeplink_script():
+    import streamlit as st
+    import streamlit.components.v1 as components
+    from src.equity_report.ui import render_tab
+    st.session_state.setdefault("er_provider", "Rules only (no LLM)")
+    render_tab(st, components, None)
+
+
 def _tab_script():
     import streamlit as st
     import streamlit.components.v1 as components
@@ -109,6 +134,17 @@ class TestStreamlitTab(unittest.TestCase):
         self.assertTrue(any("SYNTHETIC" in w.value for w in at.warning))
         downloads = at.get("download_button")
         self.assertEqual(len(downloads), 4)
+
+    def test_ticker_deep_link_generates_without_click(self):
+        from streamlit.testing.v1 import AppTest
+        at = AppTest.from_function(_deeplink_script, default_timeout=120)
+        at.query_params["ticker"] = "demo"
+        at.run()
+        self.assertFalse(at.exception, at.exception)
+        self.assertEqual(len(at.metric), 6)                           # report built on arrival
+        self.assertEqual(len(at.get("download_button")), 4)
+        at.run()                                                      # a rerun does not rebuild / re-trigger
+        self.assertEqual(at.session_state["er_autorun_done"], "DEMO")
 
 
 if __name__ == "__main__":

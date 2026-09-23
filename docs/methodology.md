@@ -446,7 +446,9 @@ $$\text{score}_t = \text{clip}\Bigl(\textstyle\sum_k w_k \cdot \mathbf{1}[\text{
 * **Valuation range (football field)** — 52-week range, historical P/E and P/B bands, DCF sensitivity and scenario range against the dotted last-price line.
 * **Sensitivity grid** — value per share for WACC ±1pp × terminal growth ±1pp; blue cells sit above the price, orange below.
 * **Technical charts** — Monthly (3y), Weekly (12m), Daily (6m) candles with moving averages, support/resistance, pattern markers (▲ bullish / ▼ bearish), MACD and slow stochastic (KD) panels.
-* **Downloads** — Excel model with live formulas (edit the yellow cells), Word research note, offline HTML dashboard, or everything as a zip.
+* **FOMC badges (H / D / S / L)** — where each tab-13 FOMC shock lands on the sensitivity grid; the table under the grid gives the exact WACC, g and value per share.
+* **Touch probabilities** — use the drift implied by the Expected Returns tab's Ridge S&P 500 forecast (via CAPM); the driftless value is shown alongside.
+* **Downloads** — Excel model with live formulas (edit the yellow cells), Word research note, offline HTML dashboard, or everything as a zip. Buy Zone scanner rows link straight to a ticker's report (`?ticker=`).
 
 ### Mathematical formulation
 
@@ -465,8 +467,16 @@ Risk-On 20/50/30 (ERP −0.25pp) · Neutral 25/50/25 · Risk-Off 40/45/15 (ERP +
 
 **Blume-adjusted beta** (2y weekly returns vs S&P 500): $\beta_{adj} = 0.67\,\beta_{raw} + 0.33$
 
-**6-month touch probability** (driftless log-normal, reflection principle)
-$$P(\text{touch } K) = 2\left[1 - \Phi\!\left(\frac{|\ln(K/S)|}{\sigma\sqrt{T}}\right)\right]$$
+**Touch-probability drift** (tab-4 Ridge S&P 500 view → CAPM)
+$$\mathbb{E}[R_s] = r_f + \beta\,(\mathbb{E}[R_m]^{\text{Ridge}} - r_f), \qquad \nu = \ln(1+\mathbb{E}[R_s]) - \tfrac{\sigma^2}{2}$$
+
+**6-month touch probability** (first passage of log price with drift $\nu$ to $b = \ln(K/S)$, $s=\sigma\sqrt{T}$)
+$$P_{b>0} = \Phi\!\left(\frac{\nu T - b}{s}\right) + e^{2\nu b/\sigma^2}\,\Phi\!\left(\frac{-b - \nu T}{s}\right)$$
+With $\nu = 0$ (no macro history) this is the reflection-principle value $2\left[1 - \Phi(|b|/s)\right]$, which the report also shows for comparison.
+
+**FOMC shock overlay** (tab-13 scenarios on the WACC × g grid)
+$$\text{WACC}' = \tfrac{E}{D+E}\bigl(r_f + \Delta r_f + \beta(\text{ERP} + \Delta\text{ERP})\bigr) + \tfrac{D}{D+E}(k_d + \Delta r_f + \Delta s)(1-\tau), \qquad g' = g_\infty + \Delta g$$
+Hawkish +50/+25/+25bp · Dovish −50/−25/−10bp · Stagflation +25/+75/+120bp, g −50bp · Liquidity crunch −25/+150/+200bp ($\Delta r_f$/$\Delta$ERP/$\Delta s$), FCF path fixed.
 
 ### Hedge-fund terminology
 

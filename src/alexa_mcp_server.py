@@ -192,12 +192,15 @@ def _data_freshness(*series: Tuple[str, str]) -> Dict[str, Any]:
 # ══════════════════════════════════════════════════════════════════
 
 _MACRO_SERIES = {"sp500": ("^GSPC", "3y"), "vix": ("^VIX", "3y"), "dgs10": ("^TNX", "3y")}
+# Long history for the Ridge S&P 500 expected return behind the equity report's touch probabilities
+# (the model needs >= 60 months with a realised 12m outcome; 3y is far too short, 10y gives ~96).
+_DRIFT_SERIES = {"sp500": ("^GSPC", "10y"), "vix": ("^VIX", "10y"), "dgs10": ("^TNX", "10y")}
 
 
-def _fetch_cached_macro_data() -> pd.DataFrame:
+def _fetch_cached_macro_data(series: Optional[Dict[str, Tuple[str, str]]] = None) -> pd.DataFrame:
     """Monthly S&P 500 / VIX / 10Y snapshot with derived regime columns, built from cached prices."""
     frames = {}
-    for col, (tkr, period) in _MACRO_SERIES.items():
+    for col, (tkr, period) in (series or _MACRO_SERIES).items():
         raw = _cached_download(tkr, period, timeout=10)
         c = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
         if isinstance(c, pd.DataFrame):
@@ -566,7 +569,7 @@ class EquityReportUnsupported(_ToolError):
 
 
 _EQUITY_TTL_SECONDS = 900
-_equity_cache: Dict[Tuple[str, str, Optional[str]], Tuple[float, Dict[str, Any]]] = {}
+_equity_cache: Dict[Tuple[str, str, Optional[str], Optional[float]], Tuple[float, Dict[str, Any]]] = {}
 
 
 def execute_get_equity_report(ticker: str = "AAPL") -> Dict[str, Any]:
@@ -581,21 +584,28 @@ def execute_get_equity_report(ticker: str = "AAPL") -> Dict[str, Any]:
     t = (ticker or "").upper().strip().replace(".", "-")
     if not _TICKER_RE.match(t) or t.startswith("^"):
         raise EquityReportUnsupported(f"'{ticker}' is not a valid stock ticker.")
-    regime_label, rf = None, None
+    from src.equity_report.engine.market_drift import expected_market_return
+
+    regime_label, rf, market = None, None, None
     try:
         macro = _fetch_cached_macro_data()
         regime_label = str(macro["regime"].iloc[-1])
         rf = float(macro["dgs10"].iloc[-1]) / 100
     except MarketDataUnavailable as e:
         logger.warning("Equity report: regime unavailable, using neutral weights: %s", e)
+    try:
+        market = expected_market_return(_fetch_cached_macro_data(_DRIFT_SERIES))
+    except (MarketDataUnavailable, ValueError, np.linalg.LinAlgError) as e:
+        logger.warning("Equity report: Ridge market view unavailable, touch probabilities driftless: %s", e)
 
-    key = (t, date.today().isoformat(), regime_label)
+    key = (t, date.today().isoformat(), regime_label,
+           None if market is None else round(market["expected_return"], 4))
     hit = _equity_cache.get(key)
     if hit and time.monotonic() - hit[0] < _EQUITY_TTL_SECONDS:
         return hit[1]
     try:
         rep = pipeline.run(t, regime_label=regime_label, risk_free=rf, provider="rules", with_positioning=False,
-                           price_fetch=lambda sym: _cached_download(sym, "3y", timeout=10))
+                           price_fetch=lambda sym: _cached_download(sym, "3y", timeout=10), market=market)
     except data_us.UnsupportedFiler as e:
         raise EquityReportUnsupported(f"{t}: {e}") from e
     except data_us.DataUnavailable as e:
@@ -611,6 +621,7 @@ def execute_get_equity_report(ticker: str = "AAPL") -> Dict[str, Any]:
 _WARM_SET = (
     ("^GSPC", "3y", 10), ("^VIX", "3y", 10), ("^TNX", "3y", 10),
     ("^IRX", "1mo", 5), ("NVDA", "6mo", 8), ("SPY", "1y", 8),
+    *((tkr, period, 15) for tkr, period in _DRIFT_SERIES.values()),
 )
 _WARM_REFRESH_SECONDS = 240
 _warm_done = threading.Event()
