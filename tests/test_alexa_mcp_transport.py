@@ -36,7 +36,7 @@ except ImportError:  # pragma: no cover
 EXPECTED_TOOLS = {
     "get_macro_regime", "get_rates_and_spreads", "simulate_portfolio_risk",
     "check_nvda_danger_zone", "scan_quant_signals", "get_expected_returns",
-    "simulate_fomc_shock",
+    "simulate_fomc_shock", "get_equity_report",
 }
 NOT_MCP_TOOLS = {"ask_macro_analyst"}  # a synchronous LLM call cannot meet the 500 ms budget
 
