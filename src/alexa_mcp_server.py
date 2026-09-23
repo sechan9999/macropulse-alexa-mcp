@@ -1003,7 +1003,7 @@ a{color:var(--accent)} footer{margin-top:28px;color:var(--muted);font-size:.85re
 """
 
 _CONTACT_URL = "https://github.com/sechan9999/macropulse-alexa-mcp/issues"
-_POLICY_UPDATED = "September 21, 2026"
+_POLICY_UPDATED = "September 23, 2026"
 
 
 def _page(title: str, body: str) -> str:
@@ -1023,8 +1023,9 @@ _PRIVACY_BODY = f"""<h1>Privacy Policy</h1>
 <p class="sub">MacroPulse Alexa+ MCP Server &middot; last updated {_POLICY_UPDATED}</p>
 <h2>What this service is</h2>
 <p>MacroPulse is a read-only information service. It answers questions about market conditions
-(macro regime, rates and spreads, portfolio risk simulations, FOMC scenarios) when an assistant such as Alexa+
-calls its tools. It has no user accounts and no sign-in.</p>
+(macro regime, rates and spreads, portfolio risk simulations, FOMC scenarios, a pre-market morning brief and
+equity reports on US-listed companies) when an assistant such as Alexa+ calls its tools. It has no user accounts
+and no sign-in.</p>
 <h2>What we receive</h2>
 <ul>
 <li>The tool request itself: the tool name and its arguments, for example a ticker symbol such as <code>SPY</code> or a scenario name.</li>
@@ -1036,6 +1037,9 @@ details or any other personal information. Please do not include personal inform
 <ul>
 <li>Requests are used only to compute the answer and return it to the caller.</li>
 <li>Ticker symbols are sent to a public market-data provider (Yahoo Finance) to fetch prices. Nothing else from your request is sent to it.</li>
+<li>For an equity report, the ticker is also used to look up the company's public filings at the U.S. Securities and
+Exchange Commission (SEC EDGAR). Those requests identify this service, as SEC rules require, not you; nothing else
+from your request is sent.</li>
 <li>Operational logs (errors, timing, request lines) are kept in the hosting provider logging service for troubleshooting and to keep the service reliable.</li>
 <li>We do not sell your data, use it for advertising, or build profiles of users.</li>
 </ul>
@@ -1054,7 +1058,9 @@ _TERMS_BODY = f"""<h1>Terms of Use</h1>
 <p>The service provides general market information and simulations. It is <strong>not investment, financial,
 tax or legal advice</strong> and is not a recommendation to buy or sell any security. Simulations (for example
 VaR or FOMC shock scenarios) rest on models and historical data and can be wrong. The expected-return tool
-returns a static reference estimate, not a forecast. Make your own decisions or consult a licensed professional.</p>
+returns a static reference estimate, not a forecast. Equity-report fair values, scenarios, price levels and
+ratings (for example "Buy" or "Underweight") are rule-based model outputs, not recommendations. Make your own
+decisions or consult a licensed professional.</p>
 <h2>Data and availability</h2>
 <ul>
 <li>Market data comes from third-party public sources and may be delayed, incomplete or unavailable. When live data cannot be fetched, the tools say so instead of guessing.</li>
@@ -1072,7 +1078,7 @@ inability to use, the service or from decisions made on its output.</p>
 <a href="{_CONTACT_URL}">{_CONTACT_URL}</a>. See also the <a href="/privacy">Privacy Policy</a>.</p>"""
 
 _LANDING_BODY = """<h1>MacroPulse Alexa+ MCP Server</h1>
-<p class="sub">Live macro-regime, rates, portfolio-risk and FOMC-shock tools for voice assistants and MCP clients. <span class="ok">status: ok</span></p>
+<p class="sub">Live macro-regime, rates, portfolio-risk, FOMC-shock, morning-brief and equity-report tools for voice assistants and MCP clients. <span class="ok">status: ok</span></p>
 <h2>MCP endpoint (Streamable HTTP)</h2>
 <code class="url">{mcp_url}</code>
 <h2>Tools</h2>
