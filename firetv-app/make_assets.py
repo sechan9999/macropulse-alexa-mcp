@@ -11,6 +11,7 @@ in the same style as the Alexa+ add-on assets (addon-package/make_assets.py). Ne
   store/firetv-background-1920x1080.png Appstore listing: Fire TV background image
   store/featured-logo-640x260.png       Appstore listing: featured content logo (transparent)
   store/featured-background-1920x720.png Appstore listing: featured content background
+  store/promo-1024x500.png              Appstore listing: promotional image (base/"tablet" assets section)
 Screenshots (1920x1080) must be real captures from a device/emulator, e.g.:
   adb shell screencap -p /sdcard/s1.png && adb pull /sdcard/s1.png
 """
@@ -142,6 +143,14 @@ def featured_background(w: int = 1920, h: int = 720) -> Image.Image:
     return img.convert("RGB").resize((w, h), Image.LANCZOS)
 
 
+def promo(w: int = 1024, h: int = 500) -> Image.Image:
+    """Featured background with the logo badge on its darkened left side."""
+    bg = featured_background(w, h).convert("RGBA")
+    logo = featured_logo(int(w * 0.36), int(w * 0.36 * 260 / 640))   # ends before the chart starts (42%)
+    bg.alpha_composite(logo, (int(w * 0.04), (h - logo.height) // 2))
+    return bg.convert("RGB")
+
+
 def main() -> None:
     (HERE / "assets").mkdir(exist_ok=True)
     (HERE / "store").mkdir(exist_ok=True)
@@ -153,6 +162,7 @@ def main() -> None:
     wide(1920, 1080, tagline=True).save(HERE / "store/firetv-background-1920x1080.png", optimize=True)
     featured_logo().save(HERE / "store/featured-logo-640x260.png", optimize=True)
     featured_background().save(HERE / "store/featured-background-1920x720.png", optimize=True)
+    promo().save(HERE / "store/promo-1024x500.png", optimize=True)
     for p in sorted([*HERE.glob("assets/*.png"), *HERE.glob("store/*.png")]):
         print(p.relative_to(HERE), Image.open(p).size)
 
