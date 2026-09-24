@@ -15,6 +15,7 @@ from __future__ import annotations
 import pandas as pd
 
 from src.macro_data import _ttl_cache, load_macro
+from src.macro_model import as_of_date
 from src.quant_signals import DEFAULT_UNIVERSE, run_quant_scan
 from src.macro_extras import summarize_nvda_danger_zone
 from src.firestore_service import get_watchlist
@@ -24,16 +25,6 @@ MAX_TOP_N = 20
 
 class FireTvDataUnavailable(RuntimeError):
     """Live data could not be loaded; the caller answers 503 instead of guessing."""
-
-
-def _as_of(df: pd.DataFrame) -> str:
-    """Date of the latest S&P 500 close behind the last row. Rows are labelled by month start, so
-    the label alone would say 2026-09-01 for data through 2026-09-24."""
-    if "_obs_date" in df and pd.notna(df["_obs_date"].iloc[-1]):
-        return pd.Timestamp(df["_obs_date"].iloc[-1]).strftime("%Y-%m-%d")
-    # A stored mart written before _obs_date existed: the latest the month's data could run to.
-    month_end = df.index[-1] + pd.offsets.MonthEnd(0)
-    return min(month_end, pd.Timestamp.today().normalize()).strftime("%Y-%m-%d")
 
 
 def regime_payload() -> dict:
@@ -55,7 +46,7 @@ def regime_payload() -> dict:
         # e.g. FRED unreachable: the regime is unavailable rather than computed from a made-up spread.
         raise FireTvDataUnavailable(f"Live macro data is incomplete ({', '.join(missing)} unavailable).")
     return {
-        "as_of": _as_of(df),
+        "as_of": as_of_date(df).strftime("%Y-%m-%d"),
         "regime": last["regime"],
         "regime_score": round(float(last["regime_score"]), 2),
         "sp500": round(float(last["sp500"]), 1),
