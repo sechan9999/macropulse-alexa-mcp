@@ -104,10 +104,8 @@ def _try_load_fred_series(start_ts, end_ts):
         return None, None
 
 
-@_ttl_cache(ttl_seconds=3600)
-def load_macro() -> pd.DataFrame:
-    """Pull S&P500, VIX, 10Y yield via BigQuery or yfinance fallback, with
-    regime/regime_score columns. Mirrors app.py's load_macro() exactly."""
+def _load_macro_stored_copy():
+    """The last macro mart written by a live refresh, used only when the live download fails."""
     if _BQ_OK:
         try:
             bq_df = load_macro_from_bigquery()
@@ -116,11 +114,18 @@ def load_macro() -> pd.DataFrame:
                     spread, slope = _try_load_fred_series(bq_df.index.min(), bq_df.index.max())
                     bq_df = attach_credit_and_slope(bq_df, spread, slope)
                 bq_df = add_regime(bq_df)
-                bq_df["_data_source"] = "GCP BigQuery"
+                bq_df["_data_source"] = "GCP BigQuery (stored copy; live download failed)"
                 return bq_df.dropna(subset=["sp500"])
         except Exception:
             pass
 
+    return None
+
+
+@_ttl_cache(ttl_seconds=3600)
+def load_macro() -> pd.DataFrame:
+    """Pull S&P500, VIX, 10Y yield via BigQuery or yfinance fallback, with
+    regime/regime_score columns. Mirrors app.py's load_macro() exactly."""
     tmap = {"sp500": "^GSPC", "vix": "^VIX", "dgs10": "^TNX", "gold": "GLD", "oil": "USO"}
     frames = {}
     for col, tkr in tmap.items():
@@ -141,6 +146,11 @@ def load_macro() -> pd.DataFrame:
                 if attempt == 2:
                     pass
     if not frames or "sp500" not in frames:
+        # Live prices unavailable: fall back to the last stored mart (real data, possibly stale)
+        # before the synthetic demo frame.
+        stored = _load_macro_stored_copy()
+        if stored is not None:
+            return stored
         idx = pd.date_range("2010-01-01", periods=180, freq="ME")
         frames["sp500"] = pd.Series([2000 + i * 15.0 for i in range(180)], index=idx)
         frames["vix"] = pd.Series(20.0, index=idx)

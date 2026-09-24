@@ -340,9 +340,8 @@ def _try_load_fred_series(start_ts, end_ts):
         state["failed_at"] = _time.time()
         return None, None
 
-@st.cache_data(ttl=3600, show_spinner="📡 Fetching macro data…")
-def load_macro() -> pd.DataFrame:
-    """Pull S&P500, VIX, 10Y yield via AWS S3 or yfinance fallback."""
+def _load_macro_stored_copy():
+    """The last macro mart written by a live refresh, used only when the live download fails."""
     if _DL_OK:
         try:
             bq_df = load_macro_from_datalake()
@@ -353,11 +352,18 @@ def load_macro() -> pd.DataFrame:
                     spread, slope = _try_load_fred_series(bq_df.index.min(), bq_df.index.max())
                     bq_df = attach_credit_and_slope(bq_df, spread, slope)
                 bq_df = add_regime(bq_df)
-                bq_df["_data_source"] = "AWS S3"
+                bq_df["_data_source"] = "AWS S3 (stored copy; live download failed)"
                 return bq_df.dropna(subset=["sp500"])
         except Exception:
             pass
 
+    return None
+
+
+@st.cache_data(ttl=3600, show_spinner="📡 Fetching macro data…")
+def load_macro() -> pd.DataFrame:
+    """Live S&P500, VIX, 10Y yield from yfinance (written to the S3 mart); the stored mart is only a
+    fallback when the live download fails, so the dashboard never freezes on an old copy."""
     tmap = {"sp500":"^GSPC","vix":"^VIX","dgs10":"^TNX","gold":"GLD","oil":"USO"}
     frames = {}
     for col, tkr in tmap.items():
@@ -378,6 +384,11 @@ def load_macro() -> pd.DataFrame:
                 if attempt == 2:
                     pass
     if not frames or "sp500" not in frames:
+        # Live prices unavailable: fall back to the last stored mart (real data, possibly stale)
+        # before the synthetic demo frame.
+        stored = _load_macro_stored_copy()
+        if stored is not None:
+            return stored
         idx = pd.date_range("2010-01-01", periods=180, freq="ME")
         frames["sp500"]  = pd.Series([2000 + i*15.0 for i in range(180)], index=idx)
         frames["vix"]    = pd.Series(20.0, index=idx)
@@ -752,7 +763,7 @@ st.markdown("""
       Macro Pulse
     </h1>
     <p style="margin:0;color:#64748b;font-size:.83rem;">
-      Institution-grade macro analysis · Regime classification · Portfolio risk simulation
+      Macro research dashboard · Point-in-time regime classification · Portfolio risk simulation
     </p>
   </div>
 </div>
