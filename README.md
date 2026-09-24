@@ -1,15 +1,24 @@
-# ⚡ Macro Pulse: Hedge Fund Multi-Factor Macro Dashboard & Quant Signals
+# ⚡ Macro Pulse: Macro Regime Dashboard, Alexa+ MCP Server & Fire TV App
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://hf-macro-dashboard.streamlit.app/)
 [![Google Cloud Run](https://img.shields.io/badge/Google%20Cloud%20Run-Live-4285F4?logo=google-cloud&logoColor=white)](https://macro-pulse-652787573242.us-central1.run.app)
 [![AWS S3](https://img.shields.io/badge/AWS%20S3-Data%20Lake-569A31?logo=amazons3&logoColor=white)](https://aws.amazon.com/s3/)
-[![Daily Quant Signal](https://github.com/sechan9999/hf-macro-dashboard/actions/workflows/daily-quant-signal.yml/badge.svg)](https://github.com/sechan9999/hf-macro-dashboard/actions/workflows/daily-quant-signal.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.11-blue.svg)](https://www.python.org/)
+[![Tests](https://github.com/sechan9999/macropulse-alexa-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/sechan9999/macropulse-alexa-mcp/actions/workflows/tests.yml)
+[![Daily Quant Signal](https://github.com/sechan9999/macropulse-alexa-mcp/actions/workflows/daily-quant-signal.yml/badge.svg)](https://github.com/sechan9999/macropulse-alexa-mcp/actions/workflows/daily-quant-signal.yml)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-**Macro Pulse** is an institutional-grade financial intelligence and quantitative screening platform. It bridges the gap between retail technical indicators (simple 14-day RSI and moving averages) and hedge-fund macro risk management (credit spreads, yield-curve dynamics, regime-switching models, walk-forward strategy backtesting, and AI-driven macro commentary).
+> **Which repository is this?** The source of truth is **[sechan9999/macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp)**. **[sechan9999/hf-macro-dashboard](https://github.com/sechan9999/hf-macro-dashboard)** is a read-only mirror that Streamlit Community Cloud deploys from; it is overwritten on every merge, so open issues and pull requests in `macropulse-alexa-mcp`.
 
-Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, **AWS S3**, and **Google Gemini AI**, Macro Pulse integrates 14 specialized analytical modules into a unified, free, real-time web dashboard.
+**Macro Pulse** is a macro research and education project. One Python quant core classifies the market regime (Risk-On / Neutral / Risk-Off from credit spreads and volatility), forecasts the S&P 500's 12-month return, stress-tests portfolios and builds SEC-filing-based equity reports. It serves three front ends:
+
+* a **14-tab Streamlit dashboard** ([hf-macro-dashboard.streamlit.app](https://hf-macro-dashboard.streamlit.app/));
+* a self-hosted **MCP server for Alexa+** on Amazon ECS (9 tools over Streamable HTTP);
+* a **Fire TV app** (Expo + react-native-tvos) that reads the same AWS endpoint.
+
+**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 158 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns.
+
+Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **scikit-learn**, **AWS (ECS, ECR, S3, Bedrock)** and **Google Gemini**.
 
 ---
 
@@ -37,18 +46,20 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 
 ### 2. 🌍 Macro & Rates
 * **10Y Treasury Yield (^TNX)**: The global discount rate driving equity duration and valuation multiples.
-* **Credit Spreads (BAA - AAA)**: Pulls real corporate credit spreads from FRED (or falls back to a deterministic 10Y proxy).
+* **Credit Spreads (BAA - AAA)**: Moody's corporate credit spread from FRED (API key, or FRED's keyless `fredgraph.csv` endpoint). If FRED is unreachable the series is shown as unavailable; no proxy is substituted.
 * **Yield-Curve Slope (10Y - 2Y)**: Classic recession barometer tracking inversion and un-inversion phases.
 * **Realized Volatility Structure**: 3-Month vs. 12-Month realized volatility divergence indicating market regime stress.
 
 ### 3. 🔍 Macro Regime Classification
-* Rule-based quantitative regime engine classifying broader market conditions into **Risk-On 🟢**, **Neutral 🟡**, or **Risk-Off 🔴**.
-* Driven by standardized z-scores of credit spreads and volatility dynamics.
-* Provides regime-conditional return distributions, Sharpe ratios, and historical win rates.
+* Rule-based regime engine classifying market conditions into **Risk-On 🟢**, **Neutral 🟡** or **Risk-Off 🔴** (thresholds ±0.5 on the stress score).
+* Stress score = z(credit spread) + z(12-month realised vol), using **expanding** means and standard deviations (data up to each month only, at least 36 months), so a past month's label never depends on later data. Months without enough history or without FRED data are **Unavailable ⚪**.
+* The Alexa+ MCP server and the Fire TV API use the same model (`src/macro_model.py`), so voice, TV and dashboard agree.
+* Provides regime-conditional return distributions, Sharpe ratios and win rates.
 
 ### 4. 🤖 Expected Returns (Ridge Regression)
-* Expanding-window Ridge Regression trained live on historical macro features (interest rates, credit spreads, volatility, and momentum).
-* Forecasts 12-month forward equity returns with **±1σ confidence intervals** and realized historical overlay to assess predictive accuracy.
+* Expanding-window Ridge regression on macro features (10Y yield, credit spread, curve slope, volatility, momentum, regime score), refit every month.
+* Each month's model is trained only on months whose 12-month outcome was already known then (12-month embargo), and the last point is **today's** forecast.
+* The ±1σ band is the spread of the model's **realised out-of-sample errors**, and the realised line is the actual return over the 12 months each forecast was about.
 
 ### 5. 📊 High-Throughput Stock Screener
 * Multi-threaded screener utilizing Python's `ThreadPoolExecutor` for parallel data acquisition (~70% faster than sequential queries).
@@ -59,12 +70,12 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 * **Weekly Buy Zone Scanner**: Multi-ticker institutional panel resampling daily data to weekly Friday closes across large caps (e.g., NVDA, MSFT, TSM, ASML, AMZN, GOOGL, AVGO, LLY, V, COST). Evaluates 20/50-week SMAs, 14-week RSI, and weekly MACD to classify tickers into *Strong Buy*, *Pullback*, *Trend Continuation*, or *Avoid (Extended)*.
 
 ### 7. 🎲 Risk Simulation (Monte Carlo Engine)
-* Simulates 1,000 to 10,000 forward market paths using geometric Brownian motion and empirical bootstrap modes.
-* Interactive probability fan charts with parametric and empirical Value-at-Risk (**VaR 95% / 99%**) and Conditional Value-at-Risk (**CVaR / Expected Shortfall**).
+* Simulates 1,000 to 10,000 forward paths with Gaussian (geometric Brownian motion) returns.
+* Probability fan charts with Value-at-Risk (**VaR 95% / 99%**) and Conditional Value-at-Risk (**CVaR / Expected Shortfall**) read from the simulated distribution.
 
 ### 8. ✨ AI Macro Analyst
 * Ingests real-time dashboard data (macro regime scores, Treasury yields, credit spreads, drawdown metrics, volatility, momentum).
-* Powered by **Google Gemini 1.5 / 3 Flash** via the unified Google GenAI SDK.
+* Powered by **Google Gemini** (`gemini-3.6-flash`, google-genai SDK) or **Amazon Bedrock** (default `amazon.nova-pro-v1:0`). The model may only quote numbers from the dashboard data it is given, and analysis is paused when live macro data is incomplete.
 * Provides institutional briefings across 5 modes:
   1. *Full Macro Briefing*
   2. *Regime Deep-Dive*
@@ -82,10 +93,10 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 ### 10. 📊 Walk-Forward Strategy Backtest
 * No-lookahead, walk-forward backtest of an SPY/Cash/Short allocation engine.
 * Configurable with three independent quantitative gates:
-  1. *Macro Regime Filter* (Hold long only when regime is not Risk-Off)
+  1. *Macro Regime Filter* (hold long only when the point-in-time regime is not Risk-Off)
   2. *12-1 Cross-Sectional / Time-Series Momentum* (Jegadeesh & Titman)
   3. *Faber 10-Month Moving Average Rule*
-* Implements a strict $T+1$ execution lag (`.shift(1)`), linear transaction costs (default 5 bps turnover slippage), equity curves, and side-by-side strategy vs. buy-and-hold metrics.
+* Implements a strict $T+1$ execution lag (`.shift(1)`), linear transaction costs (default 5 bps turnover slippage), equity curves, and side-by-side strategy vs. buy-and-hold metrics. The cash leg currently earns 0%.
 
 ### 11. 🎯 Quant Signals & Volatility Breakouts
 * **Volatility-Aware Multi-Asset Screener**:
@@ -96,21 +107,21 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
   * **Additive Scoring Engine (-100 to +100)**: Translates trend, momentum, RSI, and volatility squeeze into actionable signals (*Strong Long*, *Long*, *Neutral*, *Short*, *Strong Short*).
 
 ### 12. 🎙️ Alexa+ Institutional Copilot & MCP Terminal
-* **Model Context Protocol (MCP)**: Native **Streamable HTTP** (2025-11-25) & SSE transport server.
+* **Model Context Protocol (MCP)**: Streamable HTTP (spec 2025-11-25) and legacy SSE transports.
 * **Voice & Multimodal Simulation**: Interactive browser voice input, audio speech synthesis (TTS), and Echo Show / Fire TV multimodal visual cards.
-* **8 Quantitative MCP Tools**: Real-time programmatic access to Macro Regimes, 10Y/2Y Yield Curve Slopes, FRED Credit Spreads, 10,000-path Monte Carlo VaR, NVDA Danger Zone index, Volatility Squeezes, Ridge Expected Returns, and FOMC Cross-Asset Shocks.
+* **9 MCP tools**: morning brief, equity report, macro regime, rates and spreads (10Y yield, 10Y-3M slope, FRED Baa-Aaa spread), Monte Carlo VaR/CVaR, FOMC shock test, NVDA danger zone, volatility-squeeze scan, and a static 12-month S&P 500 reference estimate (labelled as static, not a live forecast).
 * **Developer Telemetry**: Live JSON-RPC request/response payload inspector with sub-500ms execution latency.
 
 ### 13. 🏦 Multi-Asset Portfolio Sync & FOMC Shock Desk
 * **Read-Only Brokerage Connectors**: Synchronize multi-asset holdings via Alpaca Read-Only API, Interactive Brokers (IBKR) Flex Query, Plaid schema, or institutional presets (Macro Balanced, Tech Growth, Risk Parity, All-Weather).
 * **Cross-Asset VaR & Expected Shortfall**: Full variance-covariance matrix across Equities, Fixed Income/Duration (TLT, IEF, SHY), Commodities (GLD, USO), and Crypto (BTC-USD, ETH-USD) computing 30-day VaR (95%/99%) and marginal component risk.
-* **FOMC Rate Decision Shock Matrix**: Instantaneous scenario stress testing:
+* **FOMC Rate Decision Shock Matrix**: instantaneous scenario stress test. The shock sizes below are hand-set scenario assumptions, not estimates from past FOMC days:
   * *Hawkish Surprise (+50 bps Hike)*: Duration hit (-4.8% TLT), equity multiple compression (-3.5%), USD surge.
   * *Dovish Pivot (-50 bps Cut)*: Bond rally (+5.2% TLT), tech equity expansion (+4.1%), Gold rally (+3.4%).
   * *Stagflationary Inversion*: Curve inverts -50 bps, credit spreads widen +120 bps, stocks fall -6.8%, Gold gains +5.2%.
   * *March 2020 Liquidity Crunch*: Correlated liquidation test across all risk assets.
-* **Fire TV Big Screen View**: High-contrast, large typography 10-foot UI designed for viewing on living room and trading desk wall displays.
-* **Personalized Ambient Audio Chimes**: Procedural harmonic audio cues played on Fire TV / browser when Bollinger Squeeze breakouts, credit spread divergences, or FOMC shocks occur.
+* **Big-screen view**: high-contrast, large-type layout for wall displays.
+* **Audio chimes**: procedural audio cues in the browser when Bollinger squeeze breakouts, credit-spread divergences or FOMC shocks occur.
 
 ### 14. 📑 Equity Report (ticker in, research pack out)
 * **Four downloads per ticker**: Excel DCF model with live formulas (edit the yellow assumption cells and everything recalculates), Word research note, offline HTML DCF dashboard, or all of it as a zip. Files are built in memory, nothing is written to disk.
@@ -125,16 +136,15 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 
 ---
 
-## 📺 Amazon Fire TV Companion & Appstore Release
+## 📺 Amazon Fire TV App
 
-MacroPulse includes an official companion package for **Amazon Fire TV** (`firetv/`):
-* **10-Foot UI Experience**: Overscan-safe layout with high-visibility glowing focus rings (`firetv/remote_nav.js`) fully navigable with standard Fire TV Voice Remote D-pad arrow keys (Up, Down, Left, Right, Select, Back).
-* **Hands-Free Alexa Voice Directives**:
-  * *"Alexa, ask MacroPulse for today's market regime"*
-  * *"Alexa, show the NVDA Danger Zone on the TV"*
-  * *"Alexa, run an FOMC rate shock test on my portfolio"*
-* **Alexa Presentation Language (APL 2024.1)**: Full-screen responsive templates (`skills/macropulse-alexa/`) dynamically rendered on Fire TV Stick 4K, Fire TV Cube, and Echo Show devices.
-* **Appstore Metadata**: Production submission guide and asset specifications (`firetv/appstore_listing.md`).
+The Fire TV companion app lives in [`firetv-app/`](firetv-app/) (Expo + react-native-tvos, built as an APK with EAS Build) and has been submitted to the Amazon Appstore for Fire TV.
+* **What it shows**: macro regime card, S&P 500, 10-year yield, curve slope, 12-month realised vol, the NVDA danger index and watchlist signals, refreshed every 5 minutes. No sign-in.
+* **Data**: the same AWS endpoint as the MCP server (`/api/regime`, `/api/watchlist-signals`, `/api/nvda-danger`). When live data is incomplete the API returns 503 and the app shows an error instead of placeholder numbers.
+* **10-foot UI**: D-pad navigation with a collapsible side menu and visible focus outlines.
+* **Build and store assets**: see [`firetv-app/README.md`](firetv-app/README.md); listing images are generated by `firetv-app/make_assets.py`.
+
+Voice and screens on Alexa devices come from the Alexa skill in [`skills/macropulse-alexa/`](skills/macropulse-alexa/) (APL 2024.1 cards on Fire TV and Echo Show), for example *"Alexa, ask MacroPulse for today's market regime"* or *"Alexa, show the NVDA Danger Zone on the TV"*. The earlier web prototype is in [`firetv/`](firetv/).
 
 ---
 
@@ -158,44 +168,50 @@ Macro Pulse features headless alerting that runs outside the UI:
 ### 1. Headless CLI Alert Runner
 Run scans from the terminal or pipe results directly into automated pipelines:
 ```bash
-python scripts/daily_signal_alert.py \
-  --watchlist "NVDA,AAPL,MSFT,AMZN,GOOGL,META,TSLA,SPY,QQQ,IWM" \
-  --lookback 1y \
-  --min-score 25 \
-  --slack-webhook "https://hooks.slack.com/services/..."
+python scripts/daily_signal_alert.py --tickers "NVDA,AAPL,MSFT,SPY,QQQ" --period 1y --top 8
 ```
 
 ### 2. GitHub Actions Scheduled Workflow
-The repository includes [`.github/workflows/daily-quant-signal.yml`](.github/workflows/daily-quant-signal.yml) configured to execute automatically every trading day at **13:30 UTC (9:30 AM ET pre-market)**:
-* Fetches the latest market closes.
-* Runs `scripts/daily_signal_alert.py` across core index ETFs and mega-cap tech.
-* Posts formatted markdown summaries directly to GitHub Workflow Summaries and optionally sends a Slack webhook alert.
+[`.github/workflows/daily-quant-signal.yml`](.github/workflows/daily-quant-signal.yml) runs every weekday at **12:00 UTC** (about 8:00 ET, before the open):
+* Runs `scripts/daily_signal_alert.py --period 1y --top 8` on the default universe.
+* Publishes the result to the workflow summary and commits a dated snapshot to `signals/`, which the MCP server's morning brief reads.
 
 ---
 
-## 🎙️ Alexa+ Model Context Protocol (MCP) & Streamable HTTP
+## 🎙️ Alexa+ MCP Server (Streamable HTTP)
 
-MacroPulse features an open-standard **Model Context Protocol (MCP)** server conforming to the **2025-11-25 Streamable HTTP (SSE)** specification, built specifically for the **Alexa+ Agent Skills** ecosystem:
+A self-hosted **Model Context Protocol** server (official Python MCP SDK, stateless Streamable HTTP, spec 2025-11-25) exposes 9 tools to Alexa+. The public deployment runs on **Amazon ECS Express Mode**:
 
-### 1. Launch the MCP Server
-Run the high-performance server supporting both Streamable HTTP and SSE transports:
+* **MCP endpoint**: `https://ma-76bae7709d4340b3ab4733ba644f11e4.ecs.us-east-1.on.aws/mcp` (try it with `npx @modelcontextprotocol/inspector`, transport *Streamable HTTP*)
+* The same service serves `/health`, `/privacy`, `/terms` and the Fire TV app's `/api/*`.
+* Prices and FRED series are served from caches that refresh in the background, so tools answer well within Alexa+'s latency budget. When live data cannot be fetched, a tool returns an error instead of a guess.
+
+### Run it locally
 ```bash
+pip install -r requirements-mcp.txt
 python run_alexa_mcp.py --port 8000
 ```
+Local endpoints: `http://localhost:8000/mcp` (Streamable HTTP), `/sse` and `/messages/` (legacy SSE), `/alexa/skill` (Alexa Skills Kit webhook), `/alexa/query` (voice simulator), `/health`.
 
-### 2. Available Endpoints
-* **Streamable HTTP Endpoint**: `http://localhost:8000/mcp`
-* **SSE Endpoint**: `http://localhost:8000/sse`
-* **Messages Endpoint**: `http://localhost:8000/messages`
-* **Alexa Skills Kit Webhook**: `http://localhost:8000/alexa/skill`
-* **Health Check**: `http://localhost:8000/health`
-* **Alexa Query Simulator API**: `http://localhost:8000/alexa/query`
-
-### 3. Verify Quant MCP Tools Locally
+### Deploy the container
+The MCP server has its own image; build it from **`Dockerfile.mcp`** (the default `Dockerfile` is the Streamlit dashboard):
 ```bash
-python run_alexa_mcp.py --test-tools
-python -m unittest tests/test_alexa_mcp.py
+docker build -f Dockerfile.mcp -t <account>.dkr.ecr.us-east-1.amazonaws.com/macropulse-alexa-mcp:<tag> .
+docker push <account>.dkr.ecr.us-east-1.amazonaws.com/macropulse-alexa-mcp:<tag>
 ```
+Set `SEC_USER_AGENT="Your Name you@example.com"` on the service (SEC fair-access policy); `FRED_API_KEY` is optional.
+
+---
+
+## ✅ Tests & Data Integrity
+
+```bash
+python -m pytest -q --ignore=tests/test_alexa_mcp.py   # offline suite (what CI runs)
+python -m pytest -q tests/test_alexa_mcp.py            # live-data smoke test of the MCP tools
+```
+* **Noise leakage test** (`tests/test_leakage.py`): returns are pure noise and features are persistent AR(1) noise, so nothing can be forecast. The model's out-of-sample correlation must stay below 0.10; the pre-fix model scores +0.20 to +0.32, and a second test checks that the check still catches it.
+* **Point-in-time tests** (`tests/test_macro_model.py`, `tests/test_mcp_regime.py`): rewriting data after a date must not change the regime, forecast or error band computed at that date. The MCP regime must match the dashboard's model and must not depend on VIX.
+* **No made-up numbers**: tests cover Yahoo and FRED outages for the MCP tools, the Fire TV API and the AI briefing.
 
 ---
 
@@ -218,14 +234,15 @@ The complete documentation is also compiled in [`docs/methodology.md`](docs/meth
 | **Frontend UI** | [Streamlit](https://streamlit.io/) (Dark financial theme, custom CSS layout) |
 | **Data Visualization** | [Plotly](https://plotly.com/python/) (Interactive charts, dark theme presets) |
 | **Market Data** | [yfinance](https://pypi.org/project/yfinance/) (Live real-time prices & fundamentals) |
-| **Macro Data** | [FRED API](https://fred.stlouisfed.org/) via `pandas-datareader` / direct REST |
+| **Macro Data** | [FRED](https://fred.stlouisfed.org/) (BAA, AAA, T10Y2Y) via `fredapi` or the keyless `fredgraph.csv` endpoint; SEC EDGAR XBRL for fundamentals |
 | **Machine Learning** | [scikit-learn](https://scikit-learn.org/) (Expanding-window Ridge Regression, GMM) |
 | **Scientific Computing** | [NumPy](https://numpy.org/) & [Pandas](https://pandas.pydata.org/) |
-| **AI Analyst Copilot** | [Google Gemini 1.5 / 3 Flash](https://aistudio.google.com/app/apikey) via Unified `google-genai` SDK |
+| **AI Analyst Copilot** | [Google Gemini](https://aistudio.google.com/app/apikey) (`google-genai` SDK) or Amazon Bedrock (Converse API) |
 | **Concurrency** | Python `concurrent.futures.ThreadPoolExecutor` |
-| **Automation & CI/CD** | GitHub Actions (`cron: '30 13 * * 1-5'`), Slack Webhooks, Cloud Build |
+| **Automation & CI/CD** | GitHub Actions: offline test suite on every PR, daily signal scan (`cron: '0 12 * * 1-5'`), one-way sync to the deploy mirror |
 | **Containerization** | Docker multi-stage build (`python:3.11-slim`) |
-| **Cloud Hosting** | Google Cloud Run (`agentichackathon-506620`) & Streamlit Cloud |
+| **Cloud Hosting** | Streamlit Community Cloud (dashboard), Amazon ECS Express Mode + ECR (MCP server), Google Cloud Run |
+| **Voice & TV** | MCP Python SDK (FastMCP / Starlette), Alexa Skills Kit + APL, Expo + react-native-tvos (Fire TV) |
 
 ---
 
@@ -280,7 +297,7 @@ Create `.streamlit/secrets.toml` or set environment variables:
 # Google Gemini API key (enables the AI Analyst tab):
 GEMINI_API_KEY = "your_google_gemini_api_key_here"
 
-# FRED API key (enables live BAA-AAA credit spread & yield curve from St. Louis Fed):
+# FRED API key (optional: without it the keyless fredgraph.csv endpoint is used):
 FRED_API_KEY = "your_fred_api_key_here"
 
 # Optional Slack webhook URL for automated daily signals:
@@ -323,4 +340,4 @@ Distributed under the **MIT License**. See `LICENSE` for more information.
 
 ---
 
-*© 2026 HF Research & Antigravity AI — Built for institutional research and quantitative finance education.*
+*© 2026 HF Research & Antigravity AI — Built for macro research and quantitative finance education. Informational only; not investment advice.*

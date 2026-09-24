@@ -16,6 +16,7 @@ import pandas as pd
 from starlette.testclient import TestClient
 
 import src.alexa_mcp_server as srv
+from tests._macro_fakes import fake_fred
 from src.alexa_agent_skill import AlexaMacroSkill
 
 START = {"^VIX": 18.0, "^TNX": 4.2, "^IRX": 4.0}
@@ -43,11 +44,14 @@ class DataLayerCase(unittest.TestCase):
         self.raw = mock.patch.object(srv, "_raw_download", side_effect=self._fake)
         self.raw.start()
         self.addCleanup(self.raw.stop)
+        fred = mock.patch.object(srv, "_cached_fred", return_value=fake_fred())
+        fred.start()
+        self.addCleanup(fred.stop)
         self.addCleanup(srv._cache.clear)
 
     def _fake(self, ticker, period, timeout):
         self.calls.append((ticker, period))
-        return fake_prices(ticker)
+        return fake_prices(ticker, n=5600 if period == "max" else 800)   # "max": daily since before 2005
 
     def age(self, ticker, period, seconds):
         """Make a cached series look `seconds` old."""

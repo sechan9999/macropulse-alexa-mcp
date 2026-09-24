@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 import src.alexa_mcp_server as srv
+from tests._macro_fakes import fake_fred
 from src.alexa_agent_skill import AlexaMacroSkill
 
 SCAN = """⚡ Macropulse Quant Signals — Daily Recommendation (참고용, 매매 지시 아님)
@@ -42,7 +43,7 @@ def _series(n, start, drift, vol, seed, end=None):
 def _fake_download(ticker, period, timeout=8):
     base = {"^GSPC": (5000, 0.0004, 0.01), "^VIX": (18, 0, 0.03), "^TNX": (4.2, 0, 0.01),
             "^IRX": (3.9, 0, 0.005), "SPY": (500, 0.0004, 0.01)}[ticker]
-    n = 25 if period == "1mo" else 260 if period == "1y" else 760
+    n = 25 if period == "1mo" else 260 if period == "1y" else 5600 if period == "max" else 760
     return _series(n, *base, seed=len(ticker) + n)
 
 
@@ -83,6 +84,7 @@ class TestMorningBrief(unittest.TestCase):
         with open(os.path.join(self.dir, f"{date.today().isoformat()}.md"), "w", encoding="utf-8") as fh:
             fh.write(SCAN)
         self.patches = [mock.patch.object(srv, "_cached_download", side_effect=_fake_download),
+                        mock.patch.object(srv, "_cached_fred", return_value=fake_fred()),
                         mock.patch.object(srv, "_data_freshness", return_value={"data_age_seconds": 0}),
                         mock.patch.object(srv, "_SIGNALS_DIR", self.dir)]
         for p in self.patches:
