@@ -17,7 +17,8 @@ Powered by **Streamlit**, **Plotly**, **yfinance**, **FRED**, **Scikit-learn**, 
 
 * **Google Cloud Run (Serverless GCP Deployment)**: [https://macro-pulse-652787573242.us-central1.run.app](https://macro-pulse-652787573242.us-central1.run.app)
 * **Streamlit Community Cloud**: [https://hf-macro-dashboard.streamlit.app/](https://hf-macro-dashboard.streamlit.app/)
-* **GitHub Repository**: [https://github.com/sechan9999/hf-macro-dashboard](https://github.com/sechan9999/hf-macro-dashboard)
+* **GitHub Repository (source)**: [https://github.com/sechan9999/macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp)
+* **Deploy mirror for Streamlit Cloud**: [https://github.com/sechan9999/hf-macro-dashboard](https://github.com/sechan9999/hf-macro-dashboard) (read-only; synced from the source repo)
 
 > **Where to make changes:** open PRs in [macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp). Every push to its `main` is mirrored into `hf-macro-dashboard` (the repo Streamlit Cloud deploys) by `.github/workflows/sync-hf-dashboard.yml` — one-way, `signals/` excluded, so code edited directly in `hf-macro-dashboard` is overwritten on the next sync. Needs the Actions secret `HF_DASHBOARD_PUSH_TOKEN` (fine-grained PAT, Contents: read & write on `hf-macro-dashboard`).
 
@@ -253,8 +254,8 @@ On Streamlit Cloud, put the same values in **App → Settings → Secrets**. Onc
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/sechan9999/hf-macro-dashboard.git
-cd hf-macro-dashboard
+git clone https://github.com/sechan9999/macropulse-alexa-mcp.git
+cd macropulse-alexa-mcp
 ```
 
 ### 2. Set up virtual environment

@@ -21,8 +21,8 @@ Deploy **MacroPulse** on AWS with dedicated enterprise infrastructure in under 5
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/sechan9999/hf-macro-dashboard.git
-cd hf-macro-dashboard/aws
+git clone https://github.com/sechan9999/macropulse-alexa-mcp.git
+cd macropulse-alexa-mcp/aws
 
 # 2. Run the deployment script
 chmod +x deploy_cfn.sh
