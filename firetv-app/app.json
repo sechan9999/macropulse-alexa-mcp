@@ -11,12 +11,17 @@
     ],
     "name": "MacroPulse",
     "slug": "MacroPulseTV",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "landscape",
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.macropulse.firetv",
-      "versionCode": 1
+      "versionCode": 3
+    },
+    "extra": {
+      "eas": {
+        "projectId": "da37d086-1769-4e13-a9c9-86f032269cb8"
+      }
     }
   }
 }

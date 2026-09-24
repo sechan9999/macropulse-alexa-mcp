@@ -40,6 +40,7 @@ const DrawerItem = ({
     <TouchableOpacity
       key={item.name}
       hasTVPreferredFocus={hasTVPreferredFocus}
+      activeOpacity={1} // focus is shown by the underline; don't fade the item
       onFocus={() => {
         setIsFocused(true);
         if (!isExpanded) {
