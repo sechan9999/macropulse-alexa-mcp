@@ -71,6 +71,19 @@ class TestRegimeIsPointInTime(unittest.TestCase):
         self.assertFalse(mm.is_fred_sourced(d, "_credit_source"))
 
 
+class TestAsOfDate(unittest.TestCase):
+    def test_uses_the_last_close_not_the_month_label(self):
+        d = _macro_frame(24)
+        d["_obs_date"] = d.index + pd.Timedelta(days=23)
+        self.assertEqual(mm.as_of_date(d), d.index[-1] + pd.Timedelta(days=23))
+
+    def test_without_observation_dates_it_is_never_in_the_future(self):
+        today = pd.Timestamp.today().normalize()
+        d = _macro_frame(24)
+        d.index = pd.date_range(end=today, periods=24, freq="MS")
+        self.assertEqual(mm.as_of_date(d), min(d.index[-1] + pd.offsets.MonthEnd(0), today))
+
+
 class TestFredLoading(unittest.TestCase):
     CSV = b"observation_date,BAA\n2024-01-01,5.9\n2024-02-01,.\n2024-03-01,6.1\n"
 

@@ -68,7 +68,7 @@ except Exception as _e:
     _import_errors["pandas-datareader"] = str(_e)
 
 from src.macro_model import (
-    RISK_ON, NEUTRAL, RISK_OFF, UNAVAILABLE, add_regime, attach_credit_and_slope,
+    RISK_ON, NEUTRAL, RISK_OFF, UNAVAILABLE, add_regime, as_of_date, attach_credit_and_slope,
     expected_return_model, is_fred_sourced as _is_fred_sourced, load_fred_credit_and_slope,
     missing_macro_fields,
 )
@@ -792,7 +792,7 @@ box-shadow: 0 4px 15px rgba(0,0,0,0.3); display:flex; align-items:center;">
 <span style="opacity:0.9;">Current Regime:</span>&nbsp;<b style="color:{bd}; font-size:1.05rem;">{cr}</b> 
 &nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">Stress score:</span>&nbsp;<b>{_score_txt}</b>
 &nbsp;<span style="opacity:0.7; font-size:.8rem;">(credit + volatility z-score · below −0.5 Risk-On · above +0.5 Risk-Off)</span>
-&nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">as of</span>&nbsp;<b>{df.index[-1].strftime('%b %Y')}</b></div>""", unsafe_allow_html=True)
+&nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">as of</span>&nbsp;<b>{as_of_date(df).strftime('%b %d, %Y')}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("---")
 

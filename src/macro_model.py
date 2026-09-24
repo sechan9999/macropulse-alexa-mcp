@@ -252,3 +252,12 @@ def oos_noise_correlation(fit_predict, n_runs: int = 20, n_months: int = 180, n_
         if len(both) > 10:
             cors.append(both["p"].corr(both["y_fwd"]))
     return float(np.mean(cors))
+
+
+def as_of_date(df: pd.DataFrame) -> pd.Timestamp:
+    """Date of the latest S&P 500 close behind the last row. Rows are labelled by month start, so the
+    label alone would say 2026-09-01 for data through 2026-09-24. Frames without _obs_date (a stored
+    mart written before the column existed) fall back to the month end, capped at today."""
+    if "_obs_date" in df and pd.notna(df["_obs_date"].iloc[-1]):
+        return pd.Timestamp(df["_obs_date"].iloc[-1]).normalize()
+    return min(df.index[-1] + pd.offsets.MonthEnd(0), pd.Timestamp.today().normalize())
