@@ -35,6 +35,7 @@ except Exception:
     _BOTO3_OK = False
 
 from src.macro_data import load_macro, load_spy, compute_hf_metrics
+from src.macro_model import missing_macro_fields
 
 # "gemini-2.0-flash" (what app.py's Tab 8 used to hard-code) is no longer
 # served — Google's API 404s and points at this model instead (confirmed
@@ -125,7 +126,7 @@ def build_macro_context(df: pd.DataFrame, m: dict, ytd: float, d_start, d_end) -
 
 ### Yield Curve
 - Yield Curve Slope: {latest_data['yc_slope']*100:.2f}% ({'Inverted - recession signal' if latest_data['yc_slope'] < 0 else 'Normal'})
-- Credit Spread Proxy: {latest_data['credit_spread']*100:.2f}%
+- Credit Spread (BAA-AAA): {latest_data['credit_spread']*100:.2f}%
 
 ### Momentum
 - 12-1 Momentum Signal: {latest_data['momentum_12_1']*100:.2f}%
@@ -231,6 +232,11 @@ def generate_briefing(analysis_type: str, custom_question: str = "",
         df, m, ytd, d_start, d_end = _load_dashboard_state(d_start, d_end)
     except Exception as e:
         return {"error": f"Failed to load macro data: {e}"}
+
+    missing = missing_macro_fields(df.iloc[-1])
+    if missing:
+        return {"error": f"Live macro data is incomplete ({', '.join(missing)} unavailable, e.g. FRED is "
+                         "unreachable); not generating a briefing from missing numbers."}
 
     macro_context = build_macro_context(df, m, ytd, d_start, d_end)
     prompt = build_prompt(analysis_type, macro_context, df.iloc[-1], m, custom_question)

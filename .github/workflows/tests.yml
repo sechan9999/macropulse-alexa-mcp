@@ -1,0 +1,33 @@
+name: Tests
+
+# Offline test suite, including the noise leakage check (tests/test_leakage.py): the expected-return
+# model must show no out-of-sample skill on pure-noise returns. tests/test_alexa_mcp.py is left out
+# because it calls live Yahoo Finance data.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    # This file is mirrored into hf-macro-dashboard; only run it in the source repo.
+    if: github.repository == 'sechan9999/macropulse-alexa-mcp'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+
+      - name: Run tests
+        run: python -m pytest -q --ignore=tests/test_alexa_mcp.py

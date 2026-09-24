@@ -25,6 +25,8 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+from src.macro_model import add_regime, attach_credit_and_slope, is_fred_sourced, load_fred_credit_and_slope
+
 try:
     from fredapi import Fred
     _FREDAPI_OK = True
@@ -77,36 +79,9 @@ def _ttl_cache(ttl_seconds: float):
 
 @_ttl_cache(ttl_seconds=86400)
 def _try_load_fred_series(start_ts, end_ts):
-    """Return (credit_spread_pct, yc_slope_pct) series from FRED if reachable,
-    else (None, None). credit_spread = BAA-AAA, slope = T10Y2Y. Both monthly."""
-    try:
-        start = pd.Timestamp(start_ts) - pd.DateOffset(months=2)
-        end = pd.Timestamp(end_ts)
-        key = _get_fred_key()
-        if key and _FREDAPI_OK:
-            fr = Fred(api_key=key)
-            baa = pd.Series(fr.get_series("BAA", observation_start=start, observation_end=end))
-            aaa = pd.Series(fr.get_series("AAA", observation_start=start, observation_end=end))
-            slope = pd.Series(fr.get_series("T10Y2Y", observation_start=start, observation_end=end))
-        elif _PDR_OK:
-            baa = pdr.DataReader("BAA", "fred", start, end).iloc[:, 0]
-            aaa = pdr.DataReader("AAA", "fred", start, end).iloc[:, 0]
-            slope = pdr.DataReader("T10Y2Y", "fred", start, end).iloc[:, 0]
-        else:
-            return None, None
-
-        spread = (baa - aaa).dropna()
-        spread.index = pd.to_datetime(spread.index)
-        slope.index = pd.to_datetime(slope.index)
-        spread = spread.resample("ME").last()
-        slope = slope.resample("ME").last()
-        spread.index = spread.index.to_period("M").to_timestamp()
-        slope.index = slope.index.to_period("M").to_timestamp()
-        if spread.dropna().empty or slope.dropna().empty:
-            return None, None
-        return spread, slope
-    except Exception:
-        return None, None
+    """(credit_spread_pct, yc_slope_pct) monthly series from FRED (BAA-AAA, T10Y2Y), each None when
+    unreachable. Uses the API key when set, otherwise FRED's keyless fredgraph.csv endpoint."""
+    return load_fred_credit_and_slope(start_ts, end_ts, api_key=_get_fred_key())
 
 
 @_ttl_cache(ttl_seconds=3600)
@@ -117,12 +92,10 @@ def load_macro() -> pd.DataFrame:
         try:
             bq_df = load_macro_from_bigquery()
             if bq_df is not None and not bq_df.empty and len(bq_df) > 100:
-                if "regime" not in bq_df.columns or "regime_score" not in bq_df.columns:
-                    cs = (bq_df["credit_spread"] - bq_df["credit_spread"].mean()) / bq_df["credit_spread"].std()
-                    rv = (bq_df["realized_vol_12m"] - bq_df["realized_vol_12m"].mean()) / bq_df["realized_vol_12m"].std()
-                    bq_df["regime_score"] = cs.fillna(0) + rv.fillna(0)
-                    bq_df["regime"] = np.select([bq_df["regime_score"] < -0.5, bq_df["regime_score"] > 0.5],
-                                                 ["Risk-On 🟢", "Risk-Off 🔴"], default="Neutral 🟡")
+                if not (is_fred_sourced(bq_df, "_credit_source") and is_fred_sourced(bq_df, "_slope_source")):
+                    spread, slope = _try_load_fred_series(bq_df.index.min(), bq_df.index.max())
+                    bq_df = attach_credit_and_slope(bq_df, spread, slope)
+                bq_df = add_regime(bq_df)
                 bq_df["_data_source"] = "GCP BigQuery"
                 return bq_df.dropna(subset=["sp500"])
         except Exception:
@@ -167,23 +140,8 @@ def load_macro() -> pd.DataFrame:
     df["dgs10"] = df["dgs10"].ffill()
 
     fred_credit, fred_slope = _try_load_fred_series(df.index.min(), df.index.max())
-    if fred_credit is not None:
-        df["credit_spread"] = fred_credit.reindex(df.index).ffill() / 100.0
-        df["_credit_source"] = "FRED:BAA-AAA"
-    else:
-        df["credit_spread"] = (df["dgs10"] * 0.35 + 1.5 - df["dgs10"] * 0.1).abs() / 100
-        df["_credit_source"] = "proxy"
-    if fred_slope is not None:
-        df["yc_slope"] = fred_slope.reindex(df.index).ffill() / 100.0
-        df["_slope_source"] = "FRED:T10Y2Y"
-    else:
-        df["yc_slope"] = (df["dgs10"] - df["dgs10"] * 0.65) / 100
-        df["_slope_source"] = "proxy"
-    cs = (df["credit_spread"] - df["credit_spread"].mean()) / df["credit_spread"].std()
-    rv = (df["realized_vol_12m"] - df["realized_vol_12m"].mean()) / df["realized_vol_12m"].std()
-    df["regime_score"] = cs.fillna(0) + rv.fillna(0)
-    df["regime"] = np.select([df["regime_score"] < -0.5, df["regime_score"] > 0.5],
-                              ["Risk-On 🟢", "Risk-Off 🔴"], default="Neutral 🟡")
+    df = attach_credit_and_slope(df, fred_credit, fred_slope)   # no proxy: NaN when FRED is down
+    df = add_regime(df)                                          # point-in-time (expanding) z-scores
     df["_data_source"] = "Live yfinance"
     if _BQ_OK:
         try:

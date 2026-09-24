@@ -55,6 +55,15 @@ class TestPayloads(unittest.TestCase):
             with self.assertRaises(FireTvDataUnavailable):
                 firetv_api.regime_payload()
 
+    def test_unavailable_regime_is_503_not_nan(self):
+        """FRED unreachable -> no credit spread -> regime unavailable; never serve NaN as a number."""
+        df = _macro()
+        df[["credit_spread", "regime_score"]] = np.nan
+        df["regime"] = "Unavailable ⚪"
+        with mock.patch.object(firetv_api, "load_macro", return_value=df):
+            with self.assertRaises(FireTvDataUnavailable):
+                firetv_api.regime_payload()
+
     def test_watchlist_explicit_tickers_and_top_n(self):
         self.run_scan.return_value = _scan([("AAA", 10.0, "BUY", 30, None), ("BBB", 5.0, "SELL", -20, None),
                                             ("BAD", 0.0, "HOLD", 0, "no data")])
