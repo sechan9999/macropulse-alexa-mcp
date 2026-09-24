@@ -5,8 +5,11 @@
 #   scripts/sync_hf_dashboard.sh <source checkout> <destination checkout>
 #
 # Kept out of the mirror (never copied, never deleted in the destination):
-#   signals/                              each repo's daily quant-signal bot writes its own snapshots
-#   .github/workflows/sync-hf-dashboard.yml   this sync job only runs in the source repo
+#   signals/               each repo's daily quant-signal bot writes its own snapshots
+#   .github/workflows/     GitHub refuses a push that adds or changes a workflow file unless the token
+#                          has the `workflow` scope, which HF_DASHBOARD_PUSH_TOKEN deliberately lacks;
+#                          the sync and test workflows only run in the source repo anyway, and the
+#                          mirror keeps the workflow files it already has
 # Anything else that exists only in the destination is deleted, so edit code here, not there.
 # Stages the result in the destination; the caller decides whether to commit.
 set -euo pipefail
@@ -17,7 +20,7 @@ dst="${2:?destination checkout}"
 rsync -a --delete \
   --exclude '.git/' \
   --exclude 'signals/' \
-  --exclude '.github/workflows/sync-hf-dashboard.yml' \
+  --exclude '.github/workflows/' \
   --exclude '__pycache__/' \
   --exclude '.pytest_cache/' \
   "${src%/}/" "${dst%/}/"

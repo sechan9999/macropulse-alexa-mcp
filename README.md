@@ -29,7 +29,7 @@ Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **s
 * **GitHub Repository (source)**: [https://github.com/sechan9999/macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp)
 * **Deploy mirror for Streamlit Cloud**: [https://github.com/sechan9999/hf-macro-dashboard](https://github.com/sechan9999/hf-macro-dashboard) (read-only; synced from the source repo)
 
-> **Where to make changes:** open PRs in [macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp). Every push to its `main` is mirrored into `hf-macro-dashboard` (the repo Streamlit Cloud deploys) by `.github/workflows/sync-hf-dashboard.yml` — one-way, `signals/` excluded, so code edited directly in `hf-macro-dashboard` is overwritten on the next sync. Needs the Actions secret `HF_DASHBOARD_PUSH_TOKEN` (fine-grained PAT, Contents: read & write on `hf-macro-dashboard`).
+> **Where to make changes:** open PRs in [macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp). Every push to its `main` is mirrored into `hf-macro-dashboard` (the repo Streamlit Cloud deploys) by `.github/workflows/sync-hf-dashboard.yml` — one-way, `signals/` and `.github/workflows/` excluded (the push token has no `workflow` scope), so code edited directly in `hf-macro-dashboard` is overwritten on the next sync. Needs the Actions secret `HF_DASHBOARD_PUSH_TOKEN` (fine-grained PAT, Contents: read & write on `hf-macro-dashboard`).
 
 
 ---
