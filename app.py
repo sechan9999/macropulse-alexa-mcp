@@ -156,7 +156,7 @@ st.markdown("""
   --bg-secondary: #0a0e1c;
   --bg-accent: #0f172a;
   --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
+  --text-secondary: #b6c2d3;
   --accent-blue: #38bdf8;
   --accent-indigo: #818cf8;
   --success: #34d399;
@@ -290,6 +290,26 @@ html, body, [class*="css"] {
     font-weight: 600;
 }
 
+/* Small text: widget labels, radio/checkbox options, captions, expander headers */
+[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label {
+    color: #cbd5e1 !important;
+    font-size: 0.9rem !important;
+    font-weight: 500;
+}
+[data-testid="stRadio"] label p, [data-testid="stCheckbox"] label p {
+    color: #e2e8f0 !important;
+}
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {
+    color: #b6c2d3 !important;
+}
+[data-testid="stExpander"] summary p, [data-testid="stExpander"] summary span {
+    color: #cbd5e1 !important;
+    font-weight: 500;
+}
+[data-testid="stSliderThumbValue"], [data-testid="stTickBarMin"], [data-testid="stTickBarMax"] {
+    color: #cbd5e1 !important;
+}
+
 /* Global markdown fixes for dark mode */
 .stMarkdown p, .stMarkdown li {
     color: #cbd5e1 !important;
@@ -303,12 +323,14 @@ html, body, [class*="css"] {
 """, unsafe_allow_html=True)
 
 PT = dict(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(15,23,42,0.5)",
-          font_color="#cbd5e1", margin=dict(l=60,r=30,t=60,b=60),
-          font=dict(family="Outfit, sans-serif", size=13))
+          margin=dict(l=60,r=30,t=60,b=60),
+          font=dict(family="Outfit, sans-serif", size=13, color="#e2e8f0"),
+          title_font=dict(size=17, color="#f8fafc"))
 
 def update_axes(fig, xtitle="", ytitle=""):
-    fig.update_xaxes(title_text=xtitle, gridcolor="rgba(255,255,255,0.05)", title_font=dict(size=14, color="#94a3b8"), tickfont=dict(size=12))
-    fig.update_yaxes(title_text=ytitle, gridcolor="rgba(255,255,255,0.05)", title_font=dict(size=14, color="#94a3b8"), tickfont=dict(size=12), zerolinecolor="rgba(255,255,255,0.1)")
+    fig.update_xaxes(title_text=xtitle, gridcolor="rgba(255,255,255,0.05)", title_font=dict(size=14, color="#cbd5e1"), tickfont=dict(size=12, color="#cbd5e1"))
+    fig.update_yaxes(title_text=ytitle, gridcolor="rgba(255,255,255,0.05)", title_font=dict(size=14, color="#cbd5e1"), tickfont=dict(size=12, color="#cbd5e1"), zerolinecolor="rgba(255,255,255,0.1)")
+    fig.update_layout(legend_font=dict(size=12, color="#e2e8f0"))
     return fig
 
 COLORS = ["#38bdf8","#818cf8","#34d399","#fb923c","#f472b6","#facc15","#a78bfa"]
@@ -692,7 +714,7 @@ with st.sidebar:
         st.markdown("---")
     if st.button("🔄 Reload Data"):
         st.cache_data.clear(); st.rerun()
-    st.markdown("<small style='color:#475569'>Data: yfinance · FRED · AWS S3<br>"
+    st.markdown("<small style='color:#94a3b8'>Data: yfinance · FRED · AWS S3<br>"
                 f"Source: <a href='{SOURCE_REPO_URL}' target='_blank'>github.com/sechan9999/macropulse-alexa-mcp</a><br>"
                 "© 2026 HF Research</small>",
                 unsafe_allow_html=True)
@@ -791,7 +813,7 @@ border-radius:8px; margin:12px 0; font-size:.95rem; color:#ffffff; font-weight:5
 box-shadow: 0 4px 15px rgba(0,0,0,0.3); display:flex; align-items:center;">
 <span style="opacity:0.9;">Current Regime:</span>&nbsp;<b style="color:{bd}; font-size:1.05rem;">{cr}</b> 
 &nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">Stress score:</span>&nbsp;<b>{_score_txt}</b>
-&nbsp;<span style="opacity:0.7; font-size:.8rem;">(credit + volatility z-score · below −0.5 Risk-On · above +0.5 Risk-Off)</span>
+&nbsp;<span style="opacity:0.85; font-size:.82rem;">(credit + volatility z-score · below −0.5 Risk-On · above +0.5 Risk-Off)</span>
 &nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">as of</span>&nbsp;<b>{as_of_date(df).strftime('%b %d, %Y')}</b></div>""", unsafe_allow_html=True)
 
 st.markdown("---")
@@ -1765,7 +1787,7 @@ with tab9:
         <h2 style="margin:0;background:linear-gradient(135deg,#f87171,#facc15,#fb923c);
           -webkit-background-clip:text;-webkit-text-fill-color:transparent;
           font-size:1.7rem;font-weight:800;">NVDA Danger Zone & Micro Footprint</h2>
-        <p style="margin:0;color:#64748b;font-size:.82rem;">
+        <p style="margin:0;color:#94a3b8;font-size:.85rem;">
           Composite danger scoring · Volume footprint · AI peer context
         </p>
       </div>
@@ -2168,7 +2190,7 @@ with tab10:
         <h2 style="margin:0;background:linear-gradient(135deg,#38bdf8,#818cf8,#34d399);
           -webkit-background-clip:text;-webkit-text-fill-color:transparent;
           font-size:1.7rem;font-weight:800;">Strategy Backtest</h2>
-        <p style="margin:0;color:#64748b;font-size:.82rem;">
+        <p style="margin:0;color:#94a3b8;font-size:.85rem;">
           Walk-forward, no-lookahead · Regime + momentum + trend gating · Net of costs
         </p>
       </div>
