@@ -16,7 +16,10 @@ date, so a backtest or chart built on it has no look-ahead:
 from __future__ import annotations
 
 import io
+import json
+import logging
 import os
+import urllib.parse
 import urllib.request
 from typing import Iterable, Optional, Tuple
 
@@ -31,6 +34,9 @@ HORIZON = 12                # forecast horizon (months) of the expected-return m
 RIDGE_FEATURES = ("dgs10", "credit_spread", "yc_slope", "realized_vol_12m", "momentum_12_1",
                   "regime_score", "realized_vol_3m")
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start}"
+FRED_API_URL = "https://api.stlouisfed.org/fred/series/observations"
+FRED_TIMEOUT = 15.0
+logger = logging.getLogger(__name__)
 
 
 # ── regime ────────────────────────────────────────────────────────────
@@ -66,7 +72,20 @@ def add_regime(df: pd.DataFrame, min_periods: int = Z_MIN_PERIODS) -> pd.DataFra
 
 
 # ── FRED ──────────────────────────────────────────────────────────────
-def _fred_csv(series_id: str, start: pd.Timestamp, timeout: float = 20.0) -> pd.Series:
+def _fred_api(series_id: str, start: pd.Timestamp, api_key: str, timeout: float = FRED_TIMEOUT) -> pd.Series:
+    """One series from the official FRED API (needs a free API key; works from cloud hosts, where the
+    keyless CSV endpoint can hang)."""
+    query = urllib.parse.urlencode({"series_id": series_id, "api_key": api_key, "file_type": "json",
+                                    "observation_start": pd.Timestamp(start).strftime("%Y-%m-%d")})
+    req = urllib.request.Request(f"{FRED_API_URL}?{query}", headers={"User-Agent": "MacroPulse/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        obs = json.loads(resp.read().decode("utf-8"))["observations"]
+    s = pd.to_numeric(pd.Series([o["value"] for o in obs]), errors="coerce")   # '.' = missing
+    s.index = pd.to_datetime([o["date"] for o in obs])
+    return s.dropna()
+
+
+def _fred_csv(series_id: str, start: pd.Timestamp, timeout: float = FRED_TIMEOUT) -> pd.Series:
     """One series from FRED's public fredgraph.csv endpoint (no API key needed)."""
     url = FRED_CSV_URL.format(sid=series_id, start=pd.Timestamp(start).strftime("%Y-%m-%d"))
     req = urllib.request.Request(url, headers={"User-Agent": "MacroPulse/1.0"})
@@ -78,18 +97,18 @@ def _fred_csv(series_id: str, start: pd.Timestamp, timeout: float = 20.0) -> pd.
 
 
 def fred_series(series_id: str, start, end=None, api_key: Optional[str] = None) -> pd.Series:
-    """A FRED series via fredapi when a key is available, otherwise via the keyless CSV endpoint."""
+    """A FRED series via the official API when a key is available (FRED_API_KEY), otherwise via the
+    keyless CSV endpoint. Failures are logged by type and message only; the key is never logged."""
     key = api_key if api_key is not None else os.environ.get("FRED_API_KEY")
+    s = None
     if key:
         try:
-            from fredapi import Fred
-            s = pd.Series(Fred(api_key=key).get_series(series_id, observation_start=start,
-                                                        observation_end=end)).dropna()
-            s.index = pd.to_datetime(s.index)
-            return s
-        except Exception:
-            pass                                             # fall through to the keyless endpoint
-    s = _fred_csv(series_id, pd.Timestamp(start))
+            s = _fred_api(series_id, pd.Timestamp(start), key)
+        except Exception as e:
+            logger.warning("FRED API request for %s failed (%s: %s); trying the keyless CSV endpoint",
+                           series_id, type(e).__name__, str(e).replace(key, "***"))
+    if s is None:
+        s = _fred_csv(series_id, pd.Timestamp(start))
     return s[s.index <= pd.Timestamp(end)] if end is not None else s
 
 
@@ -109,12 +128,14 @@ def load_fred_credit_and_slope(start_ts, end_ts, api_key: Optional[str] = None
     try:
         spread = _monthly((fred_series("BAA", start, end, api_key) - fred_series("AAA", start, end, api_key)).dropna())
         spread = spread if not spread.dropna().empty else None
-    except Exception:
+    except Exception as e:
+        logger.warning("FRED credit spread (BAA-AAA) unavailable: %s: %s", type(e).__name__, e)
         spread = None
     try:
         slope = _monthly(fred_series("T10Y2Y", start, end, api_key))
         slope = slope if not slope.dropna().empty else None
-    except Exception:
+    except Exception as e:
+        logger.warning("FRED curve slope (T10Y2Y) unavailable: %s: %s", type(e).__name__, e)
         slope = None
     return spread, slope
 

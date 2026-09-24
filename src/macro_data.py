@@ -78,10 +78,30 @@ def _ttl_cache(ttl_seconds: float):
 
 
 @_ttl_cache(ttl_seconds=86400)
+def _fred_series_cached(start_ts, end_ts):
+    """Successful FRED fetches are cached for a day; a failure raises (the TTL cache stores only
+    returned values), so it is retried instead of being remembered as 'unavailable' for 24 hours."""
+    spread, slope = load_fred_credit_and_slope(start_ts, end_ts, api_key=_get_fred_key())
+    if spread is None:
+        raise RuntimeError("FRED credit spread unavailable")
+    return spread, slope
+
+
+_fred_failed_at = [0.0]
+_FRED_RETRY_SECONDS = 300
+
+
 def _try_load_fred_series(start_ts, end_ts):
     """(credit_spread_pct, yc_slope_pct) monthly series from FRED (BAA-AAA, T10Y2Y), each None when
-    unreachable. Uses the API key when set, otherwise FRED's keyless fredgraph.csv endpoint."""
-    return load_fred_credit_and_slope(start_ts, end_ts, api_key=_get_fred_key())
+    unreachable (retried at most every 5 minutes). Uses the FRED API when FRED_API_KEY is set,
+    otherwise the keyless CSV endpoint."""
+    if time.time() - _fred_failed_at[0] < _FRED_RETRY_SECONDS:
+        return None, None
+    try:
+        return _fred_series_cached(start_ts, end_ts)
+    except Exception:
+        _fred_failed_at[0] = time.time()
+        return None, None
 
 
 @_ttl_cache(ttl_seconds=3600)

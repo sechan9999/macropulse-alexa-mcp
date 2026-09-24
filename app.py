@@ -128,9 +128,10 @@ except Exception as _e:
 # ── Secrets ──────────────────────────────────────────────────────────
 def _get_fred_key():
     try:
-        return st.secrets.get("FRED_API_KEY")
+        key = st.secrets.get("FRED_API_KEY")
     except Exception:
-        return os.environ.get("FRED_API_KEY")
+        key = None
+    return key or os.environ.get("FRED_API_KEY")
 
 # ── Page config ───────────────────────────────────────────────────────
 SOURCE_REPO_URL = "https://github.com/sechan9999/macropulse-alexa-mcp"   # source of truth (this deploy is a mirror)
@@ -312,10 +313,32 @@ COLORS = ["#38bdf8","#818cf8","#34d399","#fb923c","#f472b6","#facc15","#a78bfa"]
 # DATA FETCHING (cached)
 # ══════════════════════════════════════════
 @st.cache_data(ttl=86400, show_spinner=False)
+def _fred_series_cached(start_ts, end_ts):
+    """Successful FRED fetches are cached for a day; a failure raises, and st.cache_data never caches
+    an exception, so it is retried instead of being remembered as 'unavailable' for 24 hours."""
+    spread, slope = load_fred_credit_and_slope(start_ts, end_ts, api_key=_get_fred_key())
+    if spread is None:
+        raise RuntimeError("FRED credit spread unavailable")
+    return spread, slope
+
+
+@st.cache_resource
+def _fred_backoff():
+    return {"failed_at": 0.0}                  # shared across sessions; one retry per 5 minutes
+
+
 def _try_load_fred_series(start_ts, end_ts):
     """(credit_spread_pct, yc_slope_pct) monthly series from FRED (BAA-AAA, T10Y2Y), each None when
-    unreachable. Uses the API key when set, otherwise FRED's keyless fredgraph.csv endpoint."""
-    return load_fred_credit_and_slope(start_ts, end_ts, api_key=_get_fred_key())
+    unreachable. Uses the FRED API when FRED_API_KEY is set, otherwise the keyless CSV endpoint."""
+    import time as _time
+    state = _fred_backoff()
+    if _time.time() - state["failed_at"] < 300:
+        return None, None
+    try:
+        return _fred_series_cached(start_ts, end_ts)
+    except Exception:
+        state["failed_at"] = _time.time()
+        return None, None
 
 @st.cache_data(ttl=3600, show_spinner="📡 Fetching macro data…")
 def load_macro() -> pd.DataFrame:

@@ -223,27 +223,42 @@ def _fetch_fred_now() -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
         return _fred_state["data"] or (None, None)
 
 
-def _cached_fred() -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
-    """(BAA-AAA %, T10Y2Y %) monthly series, each None when FRED has not been reachable."""
+def _refresh_fred_in_background() -> None:
+    """Start one background FRED fetch unless one is already running (caller holds _fred_lock)."""
+    if _fred_state["refreshing"]:
+        return
+    _fred_state["refreshing"] = True
+
+    def _run() -> None:
+        try:
+            _fetch_fred_now()
+        finally:
+            with _fred_lock:
+                _fred_state["refreshing"] = False
+
+    threading.Thread(target=_run, daemon=True, name="refresh-fred").start()
+
+
+def _cached_fred(block: bool = False) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
+    """(BAA-AAA %, T10Y2Y %) monthly series, each None when FRED has not been reachable.
+
+    Requests never wait on FRED (block=False): a stale copy is served while a background refresh runs,
+    and with no copy yet a background fetch is started and (None, None) returned, so the tool answers
+    "unavailable" at once instead of hanging. Only the start-up warm-up passes block=True."""
     now = time.monotonic()
     with _fred_lock:
         data, fetched_at, failed_at = _fred_state["data"], _fred_state["fetched_at"], _fred_state["failed_at"]
         if data is not None and now - fetched_at <= _FRED_TTL_SECONDS:
             return data
+        backing_off = failed_at is not None and now - failed_at < _FRED_RETRY_SECONDS
         if data is not None and now - fetched_at <= _FRED_MAX_STALE_SECONDS:
-            if not _fred_state["refreshing"]:
-                _fred_state["refreshing"] = True
-
-                def _run() -> None:
-                    try:
-                        _fetch_fred_now()
-                    finally:
-                        with _fred_lock:
-                            _fred_state["refreshing"] = False
-
-                threading.Thread(target=_run, daemon=True, name="refresh-fred").start()
+            if not backing_off:
+                _refresh_fred_in_background()
             return data
-        if failed_at is not None and now - failed_at < _FRED_RETRY_SECONDS:
+        if backing_off:
+            return (None, None)
+        if not block:
+            _refresh_fred_in_background()
             return (None, None)
     return _fetch_fred_now()
 
@@ -837,7 +852,7 @@ def _warm_up_data() -> None:
     """Prefetch the default series and run every tool once, so the first request is not
     the one that pays for imports and cold caches."""
     _refresh_warm_set()
-    _cached_fred()                             # FRED credit spread / slope for the regime
+    _cached_fred(block=True)                   # FRED credit spread / slope for the regime
     for fn in (execute_simulate_fomc_shock, execute_get_macro_regime, execute_get_rates_and_spreads,
                execute_simulate_portfolio_risk, execute_check_nvda_danger_zone,
                execute_scan_quant_signals, execute_get_expected_returns, execute_get_morning_brief):
