@@ -156,6 +156,25 @@ class TestMonteCarlo(unittest.TestCase):
             pf.run_monte_carlo(0, 0, 10, method="student-t")
 
 
+class TestPerformanceLines(unittest.TestCase):
+    def test_both_lines_start_at_100_on_the_first_month_of_the_range(self):
+        full = pd.Series(1000 * np.exp(np.linspace(0, 1.5, 200)), index=pd.date_range("2005-01-01", periods=200, freq="MS"))
+        window = full.loc["2015-01-01":]                              # the dashboard's Start date
+        spy = np.log(window * 1.001 ** np.arange(len(window))).diff().dropna()   # + a small dividend drift
+        sp5, spy_idx, dd = pf.performance_lines(window, spy)
+        self.assertEqual(sp5.iloc[0], 100.0)
+        self.assertEqual(spy_idx.index[0], window.index[0])
+        self.assertEqual(spy_idx.iloc[0], 100.0)
+        self.assertAlmostEqual(sp5.iloc[-1], window.iloc[-1] / window.iloc[0] * 100)
+        self.assertGreater(spy_idx.iloc[-1], sp5.iloc[-1])            # total return beats price return
+
+    def test_drawdown_is_measured_inside_the_range(self):
+        px = pd.Series([200.0, 100.0, 110.0, 90.0, 120.0], index=_idx(5))
+        _, _, dd = pf.performance_lines(px.iloc[1:])                   # the 200 peak is before Start
+        self.assertAlmostEqual(dd.min(), 90 / 110 - 1)
+        self.assertEqual(dd.iloc[0], 0.0)
+
+
 class TestMcpSummaries(unittest.TestCase):
     def test_bootstrap_summary_uses_history(self):
         from src import macro_extras

@@ -16,7 +16,7 @@ METHODOLOGY: dict[str, dict[str, str]] = {
     "performance": {
         "title": "📈 Performance — Methodology",
         "chart": """
-* **Cumulative Return (Base = 100)** — growth path of a single dollar invested at the start. Compare the blue line (S&P 500 log returns) against the dashed yellow line (SPY actual ETF) — the gap is approximation error from the dataset, not alpha.
+* **Cumulative Return (Base = 100)** — growth path of a single dollar invested at the start. Both lines start at 100 on the Start date. The blue line is the S&P 500 *price* index; the dashed yellow line is SPY with dividends reinvested, so the gap between them is mostly the dividend yield (~1.5–2 % a year), not alpha.
 * **Rolling Drawdown** — peak-to-trough percentage decline. The deeper and longer the underwater curve, the more painful the strategy is to live through.
 * **Monthly Return Distribution** — histogram of monthly log-returns. A right-skewed bell with a tight left tail is the dream; fat left tails are the silent killer.
 * **Tear Sheet** — the row of risk-adjusted statistics every quant deck eventually settles on.
