@@ -127,8 +127,13 @@ def _get_fred_key():
         return os.environ.get("FRED_API_KEY")
 
 # ── Page config ───────────────────────────────────────────────────────
+SOURCE_REPO_URL = "https://github.com/sechan9999/macropulse-alexa-mcp"   # source of truth (this deploy is a mirror)
 st.set_page_config(page_title="Macro Pulse", page_icon="⚡", layout="wide",
-                   initial_sidebar_state="expanded")
+                   initial_sidebar_state="expanded",
+                   menu_items={"Get help": SOURCE_REPO_URL,
+                               "Report a bug": f"{SOURCE_REPO_URL}/issues",
+                               "About": f"**Macro Pulse**: macro regime, risk and equity research, also served to "
+                                        f"Alexa+ over MCP and to Fire TV. Source: {SOURCE_REPO_URL}"})
 
 
 st.markdown("""
@@ -689,7 +694,9 @@ with st.sidebar:
         st.markdown("---")
     if st.button("🔄 Reload Data"):
         st.cache_data.clear(); st.rerun()
-    st.markdown("<small style='color:#475569'>Data: yfinance · FRED · AWS S3<br>© 2026 HF Research</small>",
+    st.markdown("<small style='color:#475569'>Data: yfinance · FRED · AWS S3<br>"
+                f"Source: <a href='{SOURCE_REPO_URL}' target='_blank'>github.com/sechan9999/macropulse-alexa-mcp</a><br>"
+                "© 2026 HF Research</small>",
                 unsafe_allow_html=True)
 
 
