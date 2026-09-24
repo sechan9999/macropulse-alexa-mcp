@@ -16,7 +16,7 @@
 * a self-hosted **MCP server for Alexa+** on Amazon ECS (9 tools over Streamable HTTP);
 * a **Fire TV app** (Expo + react-native-tvos) that reads the same AWS endpoint.
 
-**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 158 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns.
+**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 191 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns.
 
 Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **scikit-learn**, **AWS (ECS, ECR, S3, Bedrock)** and **Google Gemini**.
 
@@ -42,7 +42,7 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 * **Cumulative Return (Base = 100)**: Strategy and S&P 500 total return tracked against the SPY ETF benchmark.
 * **Rolling Drawdown & Underwater Curve**: Visualizes peak-to-trough decline severity and recovery durations.
 * **Monthly Return Distributions**: Log-return histograms displaying skewness and tail-risk behavior.
-* **Full Hedge Fund Tear Sheet**: Sharpe Ratio, Sortino Ratio (downside risk only), Calmar Ratio, Maximum Drawdown (MDD), Win Rate, Profit Factor, Alpha, and Beta.
+* **Full Hedge Fund Tear Sheet**: Sharpe Ratio and Sortino Ratio (both in excess of the 3-month T-bill rate, ^IRX; Sortino divides by the downside deviation $\sqrt{\text{mean}(\min(r - r_f, 0)^2)}$ over all months), Calmar Ratio, Maximum Drawdown (MDD), Win Rate, Profit Factor, and Jensen's Alpha and Beta vs SPY on excess returns.
 
 ### 2. 🌍 Macro & Rates
 * **10Y Treasury Yield (^TNX)**: The global discount rate driving equity duration and valuation multiples.
@@ -60,6 +60,7 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 * Expanding-window Ridge regression on macro features (10Y yield, credit spread, curve slope, volatility, momentum, regime score), refit every month.
 * Each month's model is trained only on months whose 12-month outcome was already known then (12-month embargo), and the last point is **today's** forecast.
 * The ±1σ band is the spread of the model's **realised out-of-sample errors**, and the realised line is the actual return over the 12 months each forecast was about.
+* **Offline research pipeline** (`run_backtest.py`): expanding-window GMM regimes feeding a regime-conditional Ridge model and a CVaR-optimised ETF portfolio. After every monthly refit the GMM components are sorted by their mean credit spread, so `pR0` is always the calmest regime and `pR2` the most stressed (GMM numbering is otherwise arbitrary and changes between fits). FRED macro values are dated by their release, not their reference month (e.g. March CPI is first used at the end of April); revisions are not modelled, since FRED serves the current vintage.
 
 ### 5. 📊 High-Throughput Stock Screener
 * Multi-threaded screener utilizing Python's `ThreadPoolExecutor` for parallel data acquisition (~70% faster than sequential queries).
@@ -70,7 +71,9 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 * **Weekly Buy Zone Scanner**: Multi-ticker institutional panel resampling daily data to weekly Friday closes across large caps (e.g., NVDA, MSFT, TSM, ASML, AMZN, GOOGL, AVGO, LLY, V, COST). Evaluates 20/50-week SMAs, 14-week RSI, and weekly MACD to classify tickers into *Strong Buy*, *Pullback*, *Trend Continuation*, or *Avoid (Extended)*.
 
 ### 7. 🎲 Risk Simulation (Monte Carlo Engine)
-* Simulates 1,000 to 10,000 forward paths with Gaussian (geometric Brownian motion) returns.
+* Simulates 1,000 to 10,000 forward paths with one of two return models:
+  * **Gaussian**: normal monthly log returns from the chosen μ and σ (geometric Brownian motion).
+  * **Bootstrap**: resamples actual S&P 500 monthly returns since 2005 in blocks of 1-12 months, so fat tails, skew and short-range volatility clustering come from the data instead of a normal assumption. It can only replay magnitudes that already happened.
 * Probability fan charts with Value-at-Risk (**VaR 95% / 99%**) and Conditional Value-at-Risk (**CVaR / Expected Shortfall**) read from the simulated distribution.
 
 ### 8. ✨ AI Macro Analyst
@@ -96,7 +99,7 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
   1. *Macro Regime Filter* (hold long only when the point-in-time regime is not Risk-Off)
   2. *12-1 Cross-Sectional / Time-Series Momentum* (Jegadeesh & Titman)
   3. *Faber 10-Month Moving Average Rule*
-* Implements a strict $T+1$ execution lag (`.shift(1)`), linear transaction costs (default 5 bps turnover slippage), equity curves, and side-by-side strategy vs. buy-and-hold metrics. The cash leg currently earns 0%.
+* Implements a strict $T+1$ execution lag (`.shift(1)`), linear transaction costs (default 5 bps turnover slippage), equity curves, and side-by-side strategy vs. buy-and-hold metrics. The cash leg earns the 3-month T-bill yield quoted at the start of each month (the page says so if the T-bill series is unavailable and 0% is used).
 
 ### 11. 🎯 Quant Signals & Volatility Breakouts
 * **Volatility-Aware Multi-Asset Screener**:
@@ -140,7 +143,7 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 
 The Fire TV companion app lives in [`firetv-app/`](firetv-app/) (Expo + react-native-tvos, built as an APK with EAS Build) and has been submitted to the Amazon Appstore for Fire TV.
 * **What it shows**: macro regime card, S&P 500, 10-year yield, curve slope, 12-month realised vol, the NVDA danger index and watchlist signals, refreshed every 5 minutes. No sign-in.
-* **Data**: the same AWS endpoint as the MCP server (`/api/regime`, `/api/watchlist-signals`, `/api/nvda-danger`). When live data is incomplete the API returns 503 and the app shows an error instead of placeholder numbers.
+* **Data**: the same AWS endpoint as the MCP server (`/api/regime`, `/api/watchlist-signals`, `/api/nvda-danger`). When live data is incomplete the API returns 503 and the app shows an error instead of placeholder numbers. `as_of` is the date of the latest S&P 500 close, not the start of the month.
 * **10-foot UI**: D-pad navigation with a collapsible side menu and visible focus outlines.
 * **Build and store assets**: see [`firetv-app/README.md`](firetv-app/README.md); listing images are generated by `firetv-app/make_assets.py`.
 

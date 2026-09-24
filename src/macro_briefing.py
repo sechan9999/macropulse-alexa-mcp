@@ -34,7 +34,7 @@ except Exception:
     boto3 = None
     _BOTO3_OK = False
 
-from src.macro_data import load_macro, load_spy, compute_hf_metrics
+from src.macro_data import load_macro, load_spy, compute_hf_metrics, rf_monthly
 from src.macro_model import missing_macro_fields
 
 # "gemini-2.0-flash" (what app.py's Tab 8 used to hard-code) is no longer
@@ -118,14 +118,14 @@ def build_macro_context(df: pd.DataFrame, m: dict, ytd: float, d_start, d_end) -
 
 ### Risk Metrics
 - Annualized Return ({d_start} to {d_end}): {m['ann_ret']*100:.1f}%
-- Sharpe Ratio: {m['sharpe']:.2f}
+- Sharpe Ratio (excess of 3M T-bill): {m['sharpe']:.2f}
 - Sortino Ratio: {'{:.2f}'.format(m['sortino']) if np.isfinite(m['sortino']) else 'N/A'}
 - Max Drawdown: {m['mdd']*100:.1f}%
 - Calmar Ratio: {'{:.2f}'.format(m['calmar']) if np.isfinite(m['calmar']) else 'N/A'}
 - Win Rate: {m['win_rate']*100:.0f}%
 
 ### Yield Curve
-- Yield Curve Slope: {latest_data['yc_slope']*100:.2f}% ({'Inverted - recession signal' if latest_data['yc_slope'] < 0 else 'Normal'})
+- Yield Curve Slope (10Y-2Y): {latest_data['yc_slope']*100:.2f}% ({'Inverted - recession signal' if latest_data['yc_slope'] < 0 else 'Normal'})
 - Credit Spread (BAA-AAA): {latest_data['credit_spread']*100:.2f}%
 
 ### Momentum
@@ -194,7 +194,7 @@ def _load_dashboard_state(d_start: Optional[str] = None, d_end: Optional[str] = 
         raise ValueError(f"No macro data in range {d_start}..{d_end}")
 
     spy_rets = load_spy(d_start, d_end)
-    m = compute_hf_metrics(df["sp500_ret_m"].dropna(), spy_rets)
+    m = compute_hf_metrics(df["sp500_ret_m"].dropna(), spy_rets, rf=rf_monthly(df_raw))
 
     last = df.iloc[-1]
     cur_yr = df[df.index.year == datetime.now().year]

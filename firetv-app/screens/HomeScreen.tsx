@@ -88,7 +88,7 @@ const HomeScreen = () => {
                   value={`${regime.treasury_10y_pct.toFixed(2)}%`}
                 />
                 <StatTile
-                  label="Yield Curve"
+                  label="Yield Curve (10Y−2Y)"
                   value={`${regime.yield_curve_slope_pct.toFixed(2)}%`}
                 />
                 <StatTile

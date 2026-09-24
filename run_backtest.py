@@ -13,7 +13,7 @@ def main():
     px = load_prices(tickers, start="2006-01-01")
     rets = log_returns(px)
 
-    print("2. Downloading FRED Macro Data...")
+    print("2. Downloading FRED Macro Data (each value dated by its release, not its reference month)...")
     macro = load_fred(start="2000-01-01")
     macro = add_macro_features(macro)
 
@@ -24,7 +24,7 @@ def main():
     feat = macro.join(tech, how="inner").dropna()
 
     print("4. Classifying Market Regimes via GMM...")
-    # regimes
+    # regimes (pR0 = lowest-credit-spread regime ... pR2 = highest; stable across the monthly refits)
     reg_cols = ["real10y_proxy","credit_spread","yc_slope","cpi_yoy","indpro_yoy","nfci_z"]
     regimes = fit_gmm_regimes(feat, cols=reg_cols, n_regimes=3, min_train=120)
 
@@ -66,7 +66,8 @@ def main():
     # quick stats
     ann = (1+port).prod() ** (12/len(port)) - 1
     vol = port.std() * (12**0.5)
-    sharpe = ann / vol if vol>0 else float("nan")
+    excess = port - np.expm1(rets["BIL"]).reindex(port.index)   # in excess of T-bills (BIL ETF)
+    sharpe = excess.mean() * 12 / (excess.std() * (12**0.5)) if excess.std() > 0 else float("nan")
     dd = (1+port).cumprod()
     mdd = (dd/dd.cummax()-1).min()
 

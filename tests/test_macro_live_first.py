@@ -52,6 +52,16 @@ class TestLiveFirst(unittest.TestCase):
         self.stored_loader.assert_not_called()
         self.assertEqual(df.index[-1], pd.Timestamp.today().normalize().replace(day=1))   # current month
 
+    def test_last_close_date_and_tbill_are_kept(self):
+        with mock.patch.object(macro_data.yf, "download", side_effect=_daily):
+            df = macro_data.load_macro.__wrapped__()
+        last_bday = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=1)[0]
+        self.assertEqual(df["_obs_date"].iloc[-1], last_bday)                # not the month-start label
+        self.assertTrue(df[macro_data.TBILL_COLUMN].notna().all())
+        from src import firetv_api
+        with mock.patch.object(firetv_api, "load_macro", return_value=df):
+            self.assertEqual(firetv_api.regime_payload()["as_of"], last_bday.strftime("%Y-%m-%d"))
+
     def test_stored_copy_is_the_fallback_and_is_labelled(self):
         with mock.patch.object(macro_data.yf, "download", side_effect=OSError("yahoo down")):
             df = macro_data.load_macro.__wrapped__()

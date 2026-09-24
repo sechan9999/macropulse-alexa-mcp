@@ -22,11 +22,12 @@ $$R_T = \sum_{t=1}^{T} \log(1 + r_t), \qquad V_T = V_0 \cdot e^{R_T}$$
 **Annualised return / volatility (monthly inputs)**
 $$\mu_{\text{ann}} = 12\,\bar r, \qquad \sigma_{\text{ann}} = \sigma_r \sqrt{12}$$
 
-**Sharpe ratio** (excess return per unit of total risk)
-$$\text{SR} = \frac{\mu_{\text{ann}} - r_f}{\sigma_{\text{ann}}}$$
+**Sharpe ratio** (excess return per unit of total risk; $r_f$ = 3-month T-bill, ^IRX)
+$$\text{SR} = \frac{12\,\overline{(r_t - r_{f,t})}}{\mathrm{std}(r_t - r_{f,t})\sqrt{12}}$$
 
 **Sortino ratio** (penalises downside deviation only)
-$$\text{Sortino} = \frac{\mu_{\text{ann}} - r_f}{\sigma_d \sqrt{12}}, \quad \sigma_d = \mathrm{std}(r_t \mid r_t < 0)$$
+$$\text{Sortino} = \frac{12\,\overline{(r_t - r_{f,t})}}{\sigma_d \sqrt{12}}, \quad \sigma_d = \sqrt{\tfrac{1}{T}\textstyle\sum_{t=1}^{T} \min(r_t - r_{f,t},\,0)^2}$$
+The downside deviation averages over *all* months (up months count as zero), not the standard deviation of the losing months.
 
 **Maximum drawdown**
 $$\text{MDD} = \min_{t}\!\left(\frac{V_t}{\max_{s \le t} V_s} - 1\right)$$
@@ -37,8 +38,8 @@ $$\text{Calmar} = \frac{\mu_{\text{ann}}}{|\text{MDD}|}$$
 **Profit factor**
 $$\text{PF} = \frac{\sum_t r_t \, \mathbf{1}_{r_t > 0}}{\bigl|\sum_t r_t \, \mathbf{1}_{r_t < 0}\bigr|}$$
 
-**Beta / Alpha vs SPY** (CAPM)
-$$\beta = \frac{\mathrm{Cov}(r_p, r_b)}{\mathrm{Var}(r_b)}, \qquad \alpha = \mu_p - \beta\,\mu_b$$
+**Beta / Jensen's alpha vs SPY** (CAPM, on excess returns $\tilde r = r - r_f$)
+$$\beta = \frac{\mathrm{Cov}(\tilde r_p, \tilde r_b)}{\mathrm{Var}(\tilde r_b)}, \qquad \alpha = 12\bigl(\overline{\tilde r_p} - \beta\,\overline{\tilde r_b}\bigr)$$
 
 ### Hedge-fund terminology
 
@@ -261,6 +262,10 @@ $$dS_t = \mu\,S_t\,dt + \sigma\,S_t\,dW_t$$
 Discretised one period:
 $$S_{t+\Delta t} = S_t \exp\!\Bigl(\bigl(\mu - \tfrac{1}{2}\sigma^{2}\bigr)\Delta t + \sigma\sqrt{\Delta t}\,Z\Bigr), \quad Z \sim \mathcal{N}(0,1)$$
 
+**Block bootstrap** (the *Bootstrap* model): draw block starts $k_j \sim \mathcal{U}\{1, \dots, T-b+1\}$ and chain the historical monthly log returns
+$$r^{*} = \bigl(r_{k_1}, \dots, r_{k_1+b-1},\; r_{k_2}, \dots\bigr), \qquad S_h = S_0 \exp\!\Bigl(\textstyle\sum_{i \le h} r^{*}_i\Bigr)$$
+No distribution is assumed: skew, fat tails and (within a block of $b$ months) volatility clustering come from the S&P 500 history since 2005. The price is that it can only replay magnitudes that already happened.
+
 **Value at Risk** (the α-quantile of loss)
 $$\text{VaR}_\alpha(L) = \inf\{x \in \mathbb{R} : P(L \le x) \ge \alpha\}$$
 
@@ -372,7 +377,8 @@ $$\text{VIX}^{2} = \frac{2}{T}\sum_{i}\frac{\Delta K_i}{K_i^{2}}\,e^{rT}\,Q(K_i)
 ### Mathematical formulation
 
 **No-lookahead position lag**
-$$w_t = f\bigl(\text{info}_{\le t-1}\bigr), \qquad r^{p}_t = w_t \cdot r^{\text{SPY}}_t$$
+$$w_t = f\bigl(\text{info}_{\le t-1}\bigr), \qquad r^{p}_t = w_t \cdot r^{\text{SPY}}_t + (1 - w_t)\, r_{f,t}$$
+The cash leg earns $r_{f,t} = \log(1 + y^{\text{3M}}_{t-1})/12$, the T-bill yield quoted at the end of the previous month.
 
 **Aggregate signal score** (this dashboard)
 $$s_t = \frac{1}{|\mathcal{S}|}\sum_{i \in \mathcal{S}} \mathbf{1}[\text{gate}_i(t)], \qquad w^{*}_t = \mathbf{1}[s_t \ge \tau]$$
