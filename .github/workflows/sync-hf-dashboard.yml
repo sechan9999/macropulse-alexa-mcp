@@ -1,8 +1,8 @@
 name: Sync to hf-macro-dashboard
 
 # Streamlit Cloud deploys https://hf-macro-dashboard.streamlit.app from sechan9999/hf-macro-dashboard,
-# while PRs land here. Every push to main mirrors the code over (one-way, signals/ excluded) so the
-# deployed app never falls behind again.
+# while PRs land here. Every push to main mirrors the code over (one-way; signals/ and
+# .github/workflows/ excluded, see scripts/sync_hf_dashboard.sh) so the deployed app never falls behind.
 #
 # One-time setup: a fine-grained personal access token with "Contents: Read and write" on
 # sechan9999/hf-macro-dashboard only, saved in THIS repo as the Actions secret HF_DASHBOARD_PUSH_TOKEN.
