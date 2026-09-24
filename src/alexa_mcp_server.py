@@ -4,8 +4,9 @@ src/alexa_mcp_server.py
 MacroPulse Model Context Protocol (MCP) Server for Alexa+
 Serves Streamable HTTP (/mcp) and legacy SSE (/sse) and exposes 9 MCP tools:
 
-  1. get_macro_regime(): Risk-On/Neutral/Risk-Off regime from a stress z-score
-  2. get_rates_and_spreads(): 10Y yield, 10Y-3M curve slope, VIX-derived credit-spread proxy
+  1. get_macro_regime(): Risk-On/Neutral/Risk-Off regime from a point-in-time stress z-score
+     (FRED BAA-AAA credit spread + S&P 500 12m realised vol; same model as the dashboard)
+  2. get_rates_and_spreads(): 10Y yield, 10Y-3M curve slope, FRED BAA-AAA credit spread
   3. simulate_portfolio_risk(ticker, confidence, days, n_paths): Monte Carlo VaR/CVaR
   4. check_nvda_danger_zone(): NVDA Composite Danger Index, RSI, relative volume
   5. scan_quant_signals(ticker): Volatility squeeze, 20d vol, breakout score (-100..+100)
@@ -47,6 +48,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+from src.macro_model import UNAVAILABLE, add_regime, attach_credit_and_slope, expanding_z, load_fred_credit_and_slope
 
 # MCP server class from the official SDK. mcp>=2 renamed FastMCP -> MCPServer
 # (mcp.server.mcpserver); mcp 1.x only has mcp.server.fastmcp.FastMCP. Both are
@@ -193,44 +196,87 @@ def _data_freshness(*series: Tuple[str, str]) -> Dict[str, Any]:
 # QUANT ENGINE CORE HELPERS
 # ══════════════════════════════════════════════════════════════════
 
-_MACRO_SERIES = {"sp500": ("^GSPC", "3y"), "vix": ("^VIX", "3y"), "dgs10": ("^TNX", "3y")}
-# Long history for the Ridge S&P 500 expected return behind the equity report's touch probabilities
-# (the model needs >= 60 months with a realised 12m outcome; 3y is far too short, 10y gives ~96).
-_DRIFT_SERIES = {"sp500": ("^GSPC", "10y"), "vix": ("^VIX", "10y"), "dgs10": ("^TNX", "10y")}
+# Full daily history since 2005, the same window the dashboard's load_macro() uses, so the regime's
+# expanding z-scores (and the Ridge S&P 500 view behind the equity report's touch odds) match the app.
+MACRO_START = "2005-01-01"
+_MACRO_SERIES = {"sp500": ("^GSPC", "max"), "vix": ("^VIX", "max"), "dgs10": ("^TNX", "max")}
+_DRIFT_SERIES = _MACRO_SERIES
+
+# FRED (BAA-AAA credit spread, T10Y2Y) changes at most daily: cache it for hours, serve a stale copy
+# while refreshing in the background, and after a failure wait before trying again, so a request
+# never waits on FRED once the server is warm.
+_FRED_TTL_SECONDS = 6 * 3600
+_FRED_MAX_STALE_SECONDS = 7 * 24 * 3600
+_FRED_RETRY_SECONDS = 300
+_fred_lock = threading.Lock()
+_fred_state: Dict[str, Any] = {"fetched_at": None, "data": None, "failed_at": None, "refreshing": False}
+
+
+def _fetch_fred_now() -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
+    spread, slope = load_fred_credit_and_slope(MACRO_START, pd.Timestamp.today())
+    with _fred_lock:
+        if spread is not None or slope is not None:
+            _fred_state.update(fetched_at=time.monotonic(), data=(spread, slope), failed_at=None)
+        else:
+            _fred_state["failed_at"] = time.monotonic()
+            logger.warning("FRED credit spread / curve slope unavailable")
+        return _fred_state["data"] or (None, None)
+
+
+def _cached_fred() -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
+    """(BAA-AAA %, T10Y2Y %) monthly series, each None when FRED has not been reachable."""
+    now = time.monotonic()
+    with _fred_lock:
+        data, fetched_at, failed_at = _fred_state["data"], _fred_state["fetched_at"], _fred_state["failed_at"]
+        if data is not None and now - fetched_at <= _FRED_TTL_SECONDS:
+            return data
+        if data is not None and now - fetched_at <= _FRED_MAX_STALE_SECONDS:
+            if not _fred_state["refreshing"]:
+                _fred_state["refreshing"] = True
+
+                def _run() -> None:
+                    try:
+                        _fetch_fred_now()
+                    finally:
+                        with _fred_lock:
+                            _fred_state["refreshing"] = False
+
+                threading.Thread(target=_run, daemon=True, name="refresh-fred").start()
+            return data
+        if failed_at is not None and now - failed_at < _FRED_RETRY_SECONDS:
+            return (None, None)
+    return _fetch_fred_now()
+
+
+def _monthly_close(raw: pd.DataFrame) -> pd.Series:
+    """Month-end close since MACRO_START, labelled by the first day of the month (the app's index)."""
+    c = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
+    if isinstance(c, pd.DataFrame):
+        c = c.iloc[:, 0]
+    c = c.dropna()
+    if getattr(c.index, "tz", None) is not None:
+        c.index = c.index.tz_localize(None)
+    c = c[c.index >= pd.Timestamp(MACRO_START)]
+    m = c.resample("ME").last()
+    m.index = m.index.to_period("M").to_timestamp()
+    return m
 
 
 def _fetch_cached_macro_data(series: Optional[Dict[str, Tuple[str, str]]] = None) -> pd.DataFrame:
-    """Monthly S&P 500 / VIX / 10Y snapshot with derived regime columns, built from cached prices."""
-    frames = {}
-    for col, (tkr, period) in (series or _MACRO_SERIES).items():
-        raw = _cached_download(tkr, period, timeout=10)
-        c = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
-        if isinstance(c, pd.DataFrame):
-            c = c.iloc[:, 0]
-        frames[col] = c.dropna().resample("ME").last()
-
-    df = pd.DataFrame(frames).ffill().dropna()
+    """Monthly S&P 500 / VIX / 10Y since 2005 with FRED credit spread and curve slope and the
+    point-in-time regime (src/macro_model.add_regime), built from cached prices. The regime is
+    UNAVAILABLE (NaN score) when FRED could not be reached; it is never derived from a proxy."""
+    frames = {col: _monthly_close(_cached_download(tkr, period, timeout=15))
+              for col, (tkr, period) in (series or _MACRO_SERIES).items()}
+    df = pd.DataFrame(frames).ffill().dropna(subset=["sp500"])
     if len(df) < 13:
         raise MarketDataUnavailable("Not enough macro history to classify the regime.")
-
-    # Calculate returns and volatility
+    df["sp500_ret_m"] = np.log(df["sp500"]).diff()
     df["ret_m"] = df["sp500"].pct_change()
-    df["realized_vol_12m"] = df["ret_m"].rolling(12).std() * np.sqrt(12)
-
-    # Credit spread proxy (scaled from VIX dynamics; not a published spread)
-    df["credit_spread"] = 0.015 + (df["vix"] / 100.0) * 0.05
-
-    # Standardized z-score regime stress
-    cs = (df["credit_spread"] - df["credit_spread"].mean()) / (df["credit_spread"].std() + 1e-6)
-    rv = (df["realized_vol_12m"] - df["realized_vol_12m"].mean()) / (df["realized_vol_12m"].std() + 1e-6)
-    df["regime_score"] = cs.fillna(0) + rv.fillna(0)
-
-    df["regime"] = np.select(
-        [df["regime_score"] < -0.5, df["regime_score"] > 0.5],
-        ["Risk-On 🟢", "Risk-Off 🔴"],
-        default="Neutral 🟡"
-    )
-    return df
+    df["realized_vol_12m"] = df["sp500_ret_m"].rolling(12).std() * np.sqrt(12)
+    spread, slope = _cached_fred()
+    df = attach_credit_and_slope(df, spread, slope)
+    return add_regime(df)
 
 
 def _macro_freshness() -> Dict[str, Any]:
@@ -247,20 +293,24 @@ def execute_get_macro_regime() -> Dict[str, Any]:
     last = df.iloc[-1]
 
     regime = str(last["regime"])
+    if regime == UNAVAILABLE or pd.isna(last["regime_score"]):
+        raise MarketDataUnavailable("The macro regime can't be classified right now because the FRED "
+                                    "credit-spread data is unavailable.")
     score = round(float(last["regime_score"]), 2)
     sp500_price = round(float(last["sp500"]), 2)
     tnx_yield = round(float(last["dgs10"]), 2)
     vix = round(float(last["vix"]), 1)
 
-    # Historical win rate in this regime
+    # Share of past months with this (point-in-time) regime label in which the S&P 500 rose
     regime_slice = df[df["regime"] == regime]["ret_m"].dropna()
-    win_rate = round(float((regime_slice > 0).mean()) * 100, 1) if not regime_slice.empty else 65.0
+    win_rate = round(float((regime_slice > 0).mean()) * 100, 1) if len(regime_slice) >= 12 else None
 
     spoken = (
         f"Today's macroeconomic regime is classified as {regime.split()[0]} with a stress score of {score}. "
         f"The S&P 500 sits at {sp500_price:,.0f}, while 10-year Treasury yields stand at {tnx_yield}% with VIX at {vix}. "
-        f"Historically in this regime, the 30-day equity win rate has averaged {win_rate}%."
-    )
+        + (f"Historically, the S&P 500 has risen in {win_rate:.0f} percent of the months classified this way."
+           if win_rate is not None else "")
+    ).strip()
 
     return {
         "status": "success",
@@ -270,6 +320,8 @@ def execute_get_macro_regime() -> Dict[str, Any]:
         "treasury_10y_yield": tnx_yield,
         "vix": vix,
         "regime_win_rate_pct": win_rate,
+        "regime_months_in_history": int(len(regime_slice)),
+        "credit_spread_source": str(last.get("_credit_source", "unavailable")),
         "timestamp": datetime.now().isoformat(),
         **_macro_freshness(),
         "alexa_spoken_response": spoken
@@ -277,12 +329,22 @@ def execute_get_macro_regime() -> Dict[str, Any]:
 
 
 def execute_get_rates_and_spreads() -> Dict[str, Any]:
-    """Returns 10Y yield, 10Y-3M curve slope, and a VIX-derived credit spread proxy."""
+    """Returns 10Y yield, 10Y-3M curve slope, and the FRED BAA-AAA corporate credit spread."""
     df = _fetch_cached_macro_data()
     last = df.iloc[-1]
 
     tnx = round(float(last["dgs10"]), 2)
-    cs_bps = round(float(last["credit_spread"]) * 10000, 0)
+    cs = df["credit_spread"]
+    cs_bps = round(float(cs.iloc[-1]) * 10000, 0) if pd.notna(cs.iloc[-1]) else None
+    cs_z = expanding_z(cs).iloc[-1] if cs_bps is not None else np.nan
+    if cs_bps is None:
+        cs_sentence = "Credit spread data from FRED is temporarily unavailable."
+    else:
+        cs_sentence = f"The Moody's Baa minus Aaa corporate credit spread is {cs_bps:.0f} basis points"
+        if pd.notna(cs_z):
+            level = "wider than" if cs_z > 0.5 else "tighter than" if cs_z < -0.5 else "close to"
+            cs_sentence += f", {level} its average since 2005"
+        cs_sentence += "."
 
     # Short rate = 13-week T-bill yield (^IRX); slope is therefore 10Y minus 3M
     irx = _cached_download("^IRX", "1mo", timeout=5)["Close"].dropna()
@@ -296,7 +358,7 @@ def execute_get_rates_and_spreads() -> Dict[str, Any]:
     spoken = (
         f"The benchmark 10-Year Treasury yield is currently {tnx}%. "
         f"The yield curve slope between 10-year and short rates is {slope_bps:+.0f} basis points, reflecting a {curve_state} condition. "
-        f"Corporate credit spreads are estimated at {cs_bps:.0f} basis points, indicating stable liquidity conditions."
+        f"{cs_sentence}"
     )
 
     return {
@@ -306,6 +368,8 @@ def execute_get_rates_and_spreads() -> Dict[str, Any]:
         "curve_slope_bps": slope_bps,
         "curve_status": curve_state,
         "credit_spread_bps": cs_bps,
+        "credit_spread_zscore": round(float(cs_z), 2) if pd.notna(cs_z) else None,
+        "credit_spread_source": str(last.get("_credit_source", "unavailable")),
         **_data_freshness(*_MACRO_SERIES.values(), ("^IRX", "1mo")),
         "alexa_spoken_response": spoken
     }
@@ -623,7 +687,7 @@ def execute_get_morning_brief() -> Dict[str, Any]:
 
     close, change_pct, as_of = None, None, None
     try:
-        raw = _cached_download("^GSPC", "3y", timeout=10)
+        raw = _cached_download("^GSPC", "max", timeout=15)
         c = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
         if isinstance(c, pd.DataFrame):
             c = c.iloc[:, 0]
@@ -682,7 +746,7 @@ def execute_get_morning_brief() -> Dict[str, Any]:
         "spy_signal": spy,
         "signal_leaders": leaders,
         "sections_skipped": skipped,
-        **_data_freshness(*_MACRO_SERIES.values(), ("^IRX", "1mo"), ("^GSPC", "3y"), ("SPY", "1y")),
+        **_data_freshness(*_MACRO_SERIES.values(), ("^IRX", "1mo"), ("SPY", "1y")),
         "alexa_spoken_response": " ".join(parts),
     }
 
@@ -717,6 +781,8 @@ def execute_get_equity_report(ticker: str = "AAPL") -> Dict[str, Any]:
     try:
         macro = _fetch_cached_macro_data()
         regime_label = str(macro["regime"].iloc[-1])
+        if regime_label == UNAVAILABLE:             # no FRED data: neutral scenario weights, not a guess
+            regime_label = None
         rf = float(macro["dgs10"].iloc[-1]) / 100
     except MarketDataUnavailable as e:
         logger.warning("Equity report: regime unavailable, using neutral weights: %s", e)
@@ -737,7 +803,7 @@ def execute_get_equity_report(ticker: str = "AAPL") -> Dict[str, Any]:
         raise EquityReportUnsupported(f"{t}: {e}") from e
     except data_us.DataUnavailable as e:
         raise MarketDataUnavailable(str(e)) from e
-    out = {**compact_summary(rep), **_data_freshness((t, "3y"), ("^GSPC", "3y"))}
+    out = {**compact_summary(rep), **_data_freshness((t, "3y"), ("^GSPC", "max"))}
     _equity_cache[key] = (time.monotonic(), out)
     if len(_equity_cache) > 128:
         _equity_cache.pop(next(iter(_equity_cache)))
@@ -746,9 +812,8 @@ def execute_get_equity_report(ticker: str = "AAPL") -> Dict[str, Any]:
 
 # The series the tools read with their default arguments: (ticker, period, timeout).
 _WARM_SET = (
-    ("^GSPC", "3y", 10), ("^VIX", "3y", 10), ("^TNX", "3y", 10),
+    *((tkr, period, 15) for tkr, period in _MACRO_SERIES.values()),
     ("^IRX", "1mo", 5), ("NVDA", "6mo", 8), ("SPY", "1y", 8),
-    *((tkr, period, 15) for tkr, period in _DRIFT_SERIES.values()),
 )
 _WARM_REFRESH_SECONDS = 240
 _warm_done = threading.Event()
@@ -772,6 +837,7 @@ def _warm_up_data() -> None:
     """Prefetch the default series and run every tool once, so the first request is not
     the one that pays for imports and cold caches."""
     _refresh_warm_set()
+    _cached_fred()                             # FRED credit spread / slope for the regime
     for fn in (execute_simulate_fomc_shock, execute_get_macro_regime, execute_get_rates_and_spreads,
                execute_simulate_portfolio_risk, execute_check_nvda_danger_zone,
                execute_scan_quant_signals, execute_get_expected_returns, execute_get_morning_brief):
@@ -836,7 +902,7 @@ def create_mcp_server() -> FastMCP:
     def tool_macro_regime() -> Dict[str, Any]:
         return execute_get_macro_regime()
 
-    @server.tool(name="get_rates_and_spreads", description="Get 10-Year Treasury Yield, yield curve slope (10Y-2Y), and corporate credit spreads.")
+    @server.tool(name="get_rates_and_spreads", description="Get 10-Year Treasury Yield, yield curve slope (10Y minus 3-month T-bill), and the Moody's Baa-Aaa corporate credit spread from FRED.")
     def tool_rates_spreads() -> Dict[str, Any]:
         return execute_get_rates_and_spreads()
 
@@ -1011,7 +1077,7 @@ a{color:var(--accent)} footer{margin-top:28px;color:var(--muted);font-size:.85re
 """
 
 _CONTACT_URL = "https://github.com/sechan9999/macropulse-alexa-mcp/issues"
-_POLICY_UPDATED = "September 23, 2026"
+_POLICY_UPDATED = "September 24, 2026"
 
 
 def _page(title: str, body: str) -> str:
@@ -1045,6 +1111,7 @@ details or any other personal information. Please do not include personal inform
 <ul>
 <li>Requests are used only to compute the answer and return it to the caller.</li>
 <li>Ticker symbols are sent to a public market-data provider (Yahoo Finance) to fetch prices. Nothing else from your request is sent to it.</li>
+<li>Interest-rate and credit-spread series are downloaded from the Federal Reserve Bank of St. Louis (FRED). These are fixed public series; nothing from your request is sent to FRED.</li>
 <li>For an equity report, the ticker is also used to look up the company's public filings at the U.S. Securities and
 Exchange Commission (SEC EDGAR). Those requests identify this service, as SEC rules require, not you; nothing else
 from your request is sent.</li>

@@ -383,7 +383,8 @@ class AlexaMacroSkill:
                     {"label": "S&P 500", "value": f"${raw['sp500']:,.0f}"},
                     {"label": "10Y Yield", "value": f"{raw['treasury_10y_yield']:.2f}%"},
                     {"label": "VIX", "value": f"{raw['vix']:.1f}"},
-                    {"label": "Historical Win Rate", "value": f"{raw['regime_win_rate_pct']:.0f}%"}
+                    {"label": "Months Up In Regime",
+                     "value": f"{raw['regime_win_rate_pct']:.0f}%" if raw.get('regime_win_rate_pct') is not None else "n/a"}
                 ],
                 "sentiment": "bullish" if "Risk-On" in raw['regime'] else ("bearish" if "Risk-Off" in raw['regime'] else "neutral")
             }
@@ -412,7 +413,8 @@ class AlexaMacroSkill:
                 "badges": [
                     {"label": "10Y Treasury", "value": f"{raw['treasury_10y']:.2f}%"},
                     {"label": "Short Rate", "value": f"{raw['short_rate']:.2f}%"},
-                    {"label": "Credit Spread", "value": f"{raw['credit_spread_bps']:.0f} bps"},
+                    {"label": "Credit Spread (Baa-Aaa)",
+                     "value": f"{raw['credit_spread_bps']:.0f} bps" if raw.get('credit_spread_bps') is not None else "n/a"},
                     {"label": "Curve Status", "value": raw['curve_status'].upper()}
                 ],
                 "sentiment": "neutral"
