@@ -47,6 +47,22 @@ class TestPayloads(unittest.TestCase):
         self.assertEqual(r["treasury_10y_pct"], 4.2)
         self.assertEqual(r["yield_curve_slope_pct"], 0.5)
 
+    def test_as_of_is_the_last_close_not_the_month_label(self):
+        df = _macro()
+        df.index = df.index.to_period("M").to_timestamp()          # load_macro labels rows by month start
+        df["_obs_date"] = df.index + pd.Timedelta(days=23)
+        with mock.patch.object(firetv_api, "load_macro", return_value=df):
+            r = firetv_api.regime_payload()
+        self.assertEqual(r["as_of"], (df.index[-1] + pd.Timedelta(days=23)).strftime("%Y-%m-%d"))
+
+    def test_as_of_without_observation_dates_is_never_in_the_future(self):
+        df = _macro()
+        df.index = pd.date_range(end=pd.Timestamp.today().normalize(), periods=24, freq="MS")
+        with mock.patch.object(firetv_api, "load_macro", return_value=df):
+            r = firetv_api.regime_payload()
+        self.assertLessEqual(pd.Timestamp(r["as_of"]), pd.Timestamp.today().normalize())
+        self.assertGreaterEqual(pd.Timestamp(r["as_of"]), df.index[-1])
+
     def test_demo_frame_is_never_served_as_live_data(self):
         with mock.patch.object(firetv_api, "load_macro", return_value=_macro(demo=True)):
             with self.assertRaises(FireTvDataUnavailable):

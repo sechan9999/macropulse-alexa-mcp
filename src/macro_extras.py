@@ -1,19 +1,13 @@
 """
 src/macro_extras.py
 ─────────────────────────────────────────────────────────────────
-Streamlit-free copies of three more app.py analysis engines, so they
-can be exposed as MCP tools: Monte Carlo risk simulation (Tab 7),
-the walk-forward strategy backtest (Tab 10), and the NVDA danger-zone
-monitor (Tab 9).
+MCP-tool wrappers around three app.py analysis engines: Monte Carlo risk
+simulation (Tab 7), the walk-forward strategy backtest (Tab 10), and the
+NVDA danger-zone monitor (Tab 9).
 
-Same rationale as src/macro_data.py / src/macro_briefing.py: app.py
-runs Streamlit UI code at import time, so these are duplicated here
-rather than imported. run_strategy_backtest and fetch_nvda_full were
-already pure functions in app.py (no st. calls inside the function
-body) — copied verbatim aside from dropping the @st.cache_data
-decorator. The Monte Carlo logic was inline inside `with tab7:` in
-app.py; it's extracted into run_monte_carlo()/summarize_monte_carlo()
-here.
+The Monte Carlo and backtest engines live in src/portfolio.py and are
+shared with app.py. fetch_nvda_full is still a copy of the app.py version
+(app.py runs Streamlit UI code at import time, so it can't be imported).
 """
 
 from __future__ import annotations
@@ -22,32 +16,46 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
-from src.macro_data import _ttl_cache
+from src.macro_data import _ttl_cache, load_macro
+from src.portfolio import MC_BOOTSTRAP, MC_GAUSSIAN, run_monte_carlo, run_strategy_backtest  # noqa: F401
 
 
 # ══════════════════════════════════════════════════════════════════
 # Monte Carlo risk simulation (Tab 7)
 # ══════════════════════════════════════════════════════════════════
 @_ttl_cache(ttl_seconds=3600)
-def run_monte_carlo(mu: float, vol: float, n: int, h: int = 12) -> np.ndarray:
-    """mu/vol are annual, decimal (e.g. 0.08, 0.16). Returns an (n, h) array
-    of cumulative return multipliers, one row per simulated path."""
-    rng = np.random.default_rng(99)
-    shocks = rng.normal(mu / 12, vol / np.sqrt(12), (n, h))
-    return np.exp(np.cumsum(shocks, axis=1))
+def _cached_monte_carlo(mu: float, vol: float, n: int, h: int, method: str, block: int) -> np.ndarray:
+    hist = None
+    if method == MC_BOOTSTRAP:
+        df = load_macro()
+        if bool(df["_is_demo"].iloc[-1]) if "_is_demo" in df else False:
+            raise ValueError("historical S&P 500 returns are unavailable; use method='gaussian'")
+        hist = df["sp500_ret_m"]
+    return run_monte_carlo(mu, vol, n, h, method=method, hist_rets=hist, block=block)
 
 
 def summarize_monte_carlo(mu_pct: float = 8.0, vol_pct: float = 16.0,
-                           n_paths: int = 5000, horizon_months: int = 12) -> dict:
+                           n_paths: int = 5000, horizon_months: int = 12,
+                           method: str = MC_GAUSSIAN, block_months: int = 3) -> dict:
     """Run the simulation and return the same summary stats Tab 7 shows:
     expected/median return, VaR 95%, CVaR 95% (expected shortfall), P10/P90,
-    and the probability of a positive / >10% outcome."""
-    paths = run_monte_carlo(mu_pct / 100, vol_pct / 100, int(n_paths), int(horizon_months))
+    and the probability of a positive / >10% outcome. method="bootstrap" resamples
+    historical S&P 500 monthly returns (in blocks of block_months) and ignores mu/vol."""
+    if method not in (MC_GAUSSIAN, MC_BOOTSTRAP):
+        return {"error": f"method must be '{MC_GAUSSIAN}' or '{MC_BOOTSTRAP}'"}
+    block = int(block_months) if method == MC_BOOTSTRAP else 1
+    try:
+        paths = _cached_monte_carlo(mu_pct / 100, vol_pct / 100, int(n_paths), int(horizon_months),
+                                    method, block)
+    except ValueError as e:                     # not enough history for a bootstrap
+        return {"error": str(e)}
     final_ret = (paths[:, -1] - 1) * 100
     var95 = float(np.percentile(final_ret, 5))
     cvar95 = float(final_ret[final_ret < var95].mean())
     return {
-        "mu_pct": mu_pct, "vol_pct": vol_pct, "n_paths": int(n_paths), "horizon_months": int(horizon_months),
+        "method": method,
+        **({"block_months": block} if method == MC_BOOTSTRAP else {"mu_pct": mu_pct, "vol_pct": vol_pct}),
+        "n_paths": int(n_paths), "horizon_months": int(horizon_months),
         "expected_return_pct": round(float(final_ret.mean()), 2),
         "median_return_pct": round(float(np.median(final_ret)), 2),
         "var_95_pct": round(var95, 2),
@@ -62,56 +70,6 @@ def summarize_monte_carlo(mu_pct: float = 8.0, vol_pct: float = 16.0,
 # ══════════════════════════════════════════════════════════════════
 # Walk-forward strategy backtest (Tab 10)
 # ══════════════════════════════════════════════════════════════════
-def run_strategy_backtest(macro_df: pd.DataFrame, *, use_regime: bool, use_momentum: bool,
-                           use_trend: bool, threshold: float, cost_bps: float,
-                           allow_short: bool) -> pd.DataFrame:
-    """Walk-forward, no-lookahead backtest of an SPY/cash (or SPY/-SPY) strategy.
-
-    Position is decided from data observable at month T, then applied to the
-    realised return from T to T+1 via .shift(1). Net returns include linear
-    transaction costs proportional to turnover."""
-    out = macro_df.copy()
-    out = out.dropna(subset=["sp500_ret_m"])
-
-    out["sig_regime"] = (out["regime"] != "Risk-Off 🔴").astype(int)
-    out["sig_momentum"] = (out["momentum_12_1"] > 0).astype(int)
-    sma_10m = out["sp500"].rolling(10).mean()
-    out["sig_trend"] = (out["sp500"] > sma_10m).astype(int)
-
-    cols = []
-    if use_regime:
-        cols.append("sig_regime")
-    if use_momentum:
-        cols.append("sig_momentum")
-    if use_trend:
-        cols.append("sig_trend")
-
-    if not cols:
-        out["sig_score"] = 1.0
-    else:
-        out["sig_score"] = out[cols].mean(axis=1)
-
-    in_market = (out["sig_score"] >= threshold).astype(float)
-    if allow_short:
-        out_market = -1.0 * (out["sig_score"] < (1 - threshold)).astype(float)
-        target_w = in_market + out_market
-    else:
-        target_w = in_market
-
-    out["target_w"] = target_w
-    out["position"] = out["target_w"].shift(1).fillna(0.0)  # NO-LOOKAHEAD
-    out["turnover"] = out["position"].diff().abs().fillna(out["position"].abs())
-
-    cost = (cost_bps / 10000.0) * out["turnover"]
-    out["strat_ret_gross"] = out["position"] * out["sp500_ret_m"]
-    out["strat_ret"] = out["strat_ret_gross"] - cost
-    out["strat_equity"] = np.exp(out["strat_ret"].fillna(0.0).cumsum()) * 100
-    out["bh_equity"] = np.exp(out["sp500_ret_m"].fillna(0.0).cumsum()) * 100
-    out["strat_dd"] = out["strat_equity"] / out["strat_equity"].cummax() - 1
-    out["bh_dd"] = out["bh_equity"] / out["bh_equity"].cummax() - 1
-    return out
-
-
 def summarize_backtest(macro_df: pd.DataFrame, compute_hf_metrics, *,
                         use_regime: bool = True, use_momentum: bool = True, use_trend: bool = True,
                         threshold: float = 0.5, cost_bps: float = 5.0, allow_short: bool = False) -> dict:
@@ -124,8 +82,8 @@ def summarize_backtest(macro_df: pd.DataFrame, compute_hf_metrics, *,
     if bt["strat_ret"].dropna().empty:
         return {"error": "No data after filters — widen the date range or relax the threshold."}
 
-    m_strat = compute_hf_metrics(bt["strat_ret"].dropna(), bt["sp500_ret_m"].dropna())
-    m_bh = compute_hf_metrics(bt["sp500_ret_m"].dropna())
+    m_strat = compute_hf_metrics(bt["strat_ret"].dropna(), bt["sp500_ret_m"].dropna(), rf=bt["rf_m"])
+    m_bh = compute_hf_metrics(bt["sp500_ret_m"].dropna(), rf=bt["rf_m"])
     time_in_market_pct = float(bt["position"].abs().mean() * 100)
     n_position_flips = int((bt["position"].diff().abs() > 1e-9).sum())
 
@@ -138,15 +96,18 @@ def summarize_backtest(macro_df: pd.DataFrame, compute_hf_metrics, *,
         "strategy": {
             "annualized_return_pct": _r(m_strat["ann_ret"] * 100),
             "sharpe": _r(m_strat["sharpe"]),
+            "sortino": _r(m_strat["sortino"]),
             "max_drawdown_pct": _r(m_strat["mdd"] * 100),
             "calmar": _r(m_strat["calmar"]),
         },
         "buy_and_hold": {
             "annualized_return_pct": _r(m_bh["ann_ret"] * 100),
             "sharpe": _r(m_bh["sharpe"]),
+            "sortino": _r(m_bh["sortino"]),
             "max_drawdown_pct": _r(m_bh["mdd"] * 100),
             "calmar": _r(m_bh["calmar"]),
         },
+        "cash_rate": bt.attrs.get("cash_rate"),
         "time_in_market_pct": round(time_in_market_pct, 1),
         "n_position_flips": n_position_flips,
     }

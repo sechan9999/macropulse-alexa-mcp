@@ -26,6 +26,16 @@ class FireTvDataUnavailable(RuntimeError):
     """Live data could not be loaded; the caller answers 503 instead of guessing."""
 
 
+def _as_of(df: pd.DataFrame) -> str:
+    """Date of the latest S&P 500 close behind the last row. Rows are labelled by month start, so
+    the label alone would say 2026-09-01 for data through 2026-09-24."""
+    if "_obs_date" in df and pd.notna(df["_obs_date"].iloc[-1]):
+        return pd.Timestamp(df["_obs_date"].iloc[-1]).strftime("%Y-%m-%d")
+    # A stored mart written before _obs_date existed: the latest the month's data could run to.
+    month_end = df.index[-1] + pd.offsets.MonthEnd(0)
+    return min(month_end, pd.Timestamp.today().normalize()).strftime("%Y-%m-%d")
+
+
 def regime_payload() -> dict:
     """Today's macro regime and the readings behind it (RegimeResponse)."""
     try:
@@ -45,7 +55,7 @@ def regime_payload() -> dict:
         # e.g. FRED unreachable: the regime is unavailable rather than computed from a made-up spread.
         raise FireTvDataUnavailable(f"Live macro data is incomplete ({', '.join(missing)} unavailable).")
     return {
-        "as_of": df.index[-1].strftime("%Y-%m-%d"),
+        "as_of": _as_of(df),
         "regime": last["regime"],
         "regime_score": round(float(last["regime_score"]), 2),
         "sp500": round(float(last["sp500"]), 1),

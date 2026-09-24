@@ -29,7 +29,7 @@ load_dotenv()
 
 from mcp.server.mcpserver import MCPServer
 
-from src.macro_data import load_macro, load_spy, compute_hf_metrics
+from src.macro_data import load_macro, load_spy, compute_hf_metrics, rf_monthly
 from src.quant_signals import run_quant_scan, format_alert_text, DEFAULT_UNIVERSE
 from src.macro_briefing import generate_briefing, ANALYSIS_TYPES
 from src.macro_extras import summarize_monte_carlo, summarize_backtest, summarize_nvda_danger_zone
@@ -186,12 +186,13 @@ def get_risk_metrics(start: str = "", end: str = "") -> dict:
     end = end or datetime.now().strftime("%Y-%m-%d")
 
     df = load_macro()
+    rf = rf_monthly(df)                      # from the full history, so the first month has a rate
     df = df[(df.index >= start) & (df.index <= end)]
     if df.empty:
         return {"error": f"No data in range {start}..{end}"}
 
     spy_rets = load_spy(start, end)
-    m = compute_hf_metrics(df["sp500_ret_m"].dropna(), spy_rets)
+    m = compute_hf_metrics(df["sp500_ret_m"].dropna(), spy_rets, rf=rf)
 
     def _r(x):
         return None if x is None or x != x else round(float(x), 4)  # NaN-safe
@@ -200,8 +201,9 @@ def get_risk_metrics(start: str = "", end: str = "") -> dict:
         "start": start, "end": end,
         "annualized_return_pct": _r(m["ann_ret"] * 100),
         "annualized_vol_pct": _r(m["ann_vol"] * 100),
-        "sharpe": _r(m["sharpe"]),
-        "sortino": _r(m["sortino"]),
+        "sharpe": _r(m["sharpe"]),                      # excess of the 3-month T-bill
+        "sortino": _r(m["sortino"]),                    # downside deviation of the excess return
+        "risk_free_ann_pct": _r(m["rf_ann"] * 100),
         "max_drawdown_pct": _r(m["mdd"] * 100),
         "calmar": _r(m["calmar"]),
         "win_rate_pct": _r(m["win_rate"] * 100),
@@ -230,13 +232,18 @@ def get_macro_briefing(analysis_type: str = "Full Macro Briefing", custom_questi
 
 @mcp.tool()
 def get_monte_carlo_risk(mu_pct: float = 8.0, vol_pct: float = 16.0,
-                          n_paths: int = 5000, horizon_months: int = 12) -> dict:
-    """Run a Monte Carlo simulation of forward returns given an assumed
-    annual expected return (mu_pct) and volatility (vol_pct), both in
-    percent. Returns expected/median return, VaR 95%, CVaR 95% (expected
+                          n_paths: int = 5000, horizon_months: int = 12,
+                          method: str = "gaussian", block_months: int = 3) -> dict:
+    """Run a Monte Carlo simulation of forward returns. method="gaussian"
+    draws normal monthly returns from an assumed annual expected return
+    (mu_pct) and volatility (vol_pct), both in percent; method="bootstrap"
+    instead resamples historical S&P 500 monthly returns since 2005 in
+    blocks of block_months (keeps fat tails; mu_pct/vol_pct are ignored).
+    Returns expected/median return, VaR 95%, CVaR 95% (expected
     shortfall), P10/P90, and probability of a positive / >10% outcome
     over the given horizon. Informational only, not a forecast."""
-    return summarize_monte_carlo(mu_pct=mu_pct, vol_pct=vol_pct, n_paths=n_paths, horizon_months=horizon_months)
+    return summarize_monte_carlo(mu_pct=mu_pct, vol_pct=vol_pct, n_paths=n_paths, horizon_months=horizon_months,
+                                 method=method, block_months=block_months)
 
 
 @mcp.tool()
@@ -247,7 +254,8 @@ def get_strategy_backtest(use_regime: bool = True, use_momentum: bool = True, us
     10-month SMA trend) and compare it to buy-and-hold. threshold is the
     fraction of active signals required to be long (0.34-1.0); cost_bps is
     the round-trip transaction cost per unit of turnover. Returns each
-    side's annualized return, Sharpe, max drawdown, and Calmar ratio, plus
+    side's annualized return, Sharpe and Sortino (in excess of the T-bill
+    rate, which the cash leg also earns), max drawdown, and Calmar ratio, plus
     time-in-market and how often the position flipped. Informational only,
     not trading advice."""
     df = load_macro()

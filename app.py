@@ -72,6 +72,10 @@ from src.macro_model import (
     expected_return_model, is_fred_sourced as _is_fred_sourced, load_fred_credit_and_slope,
     missing_macro_fields,
 )
+from src.portfolio import (
+    MC_BOOTSTRAP, MC_GAUSSIAN, TBILL_COLUMN, TBILL_TICKER, compute_hf_metrics, rf_monthly,
+    run_monte_carlo, run_strategy_backtest,
+)
 
 try:
     from src.methodology import render as render_methodology
@@ -364,7 +368,7 @@ def _load_macro_stored_copy():
 def load_macro() -> pd.DataFrame:
     """Live S&P500, VIX, 10Y yield from yfinance (written to the S3 mart); the stored mart is only a
     fallback when the live download fails, so the dashboard never freezes on an old copy."""
-    tmap = {"sp500":"^GSPC","vix":"^VIX","dgs10":"^TNX","gold":"GLD","oil":"USO"}
+    tmap = {"sp500":"^GSPC","vix":"^VIX","dgs10":"^TNX",TBILL_COLUMN:TBILL_TICKER,"gold":"GLD","oil":"USO"}
     frames = {}
     for col, tkr in tmap.items():
         for attempt in range(3):
@@ -376,7 +380,13 @@ def load_macro() -> pd.DataFrame:
                 close = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
                 if isinstance(close, pd.DataFrame):
                     close = close.iloc[:, 0]
-                close = close.dropna().resample("ME").last()
+                close = close.dropna()
+                if col == "sp500":            # the real last trading day in each month (the as-of date)
+                    days = close.index.tz_localize(None) if close.index.tz is not None else close.index
+                    obs = pd.Series(days, index=close.index).resample("ME").last()
+                    obs.index = obs.index.to_period("M").to_timestamp()
+                    frames["_obs_date"] = obs
+                close = close.resample("ME").last()
                 close.index = close.index.to_period("M").to_timestamp()
                 frames[col] = close
                 break
@@ -406,6 +416,8 @@ def load_macro() -> pd.DataFrame:
     df["cumret"]           = np.exp(df["sp500_ret_m"].cumsum()) * 100
     df["drawdown"]         = df["cumret"] / df["cumret"].cummax() - 1
     df["dgs10"]            = df["dgs10"].ffill()
+    if TBILL_COLUMN in df:
+        df[TBILL_COLUMN]   = df[TBILL_COLUMN].ffill()
 
     # Real FRED series only: when FRED is unreachable the columns stay empty and the regime is
     # reported as unavailable instead of being derived from a made-up spread.
@@ -619,28 +631,7 @@ def scan_buy_zones(tickers: tuple, years: int = 3):
     return pd.DataFrame(rows)
 
 # ── Risk metrics ──────────────────────────────────────────────────────
-def compute_hf_metrics(rets: pd.Series, bench_rets: pd.Series | None = None):
-    ann_ret  = rets.mean() * 12
-    ann_vol  = rets.std() * np.sqrt(12)
-    sharpe   = ann_ret / ann_vol if ann_vol > 0 else np.nan
-    neg      = rets[rets < 0]
-    sortino  = ann_ret / (neg.std()*np.sqrt(12)) if len(neg) > 0 else np.nan
-    cum      = np.exp(rets.cumsum())
-    mdd      = (cum / cum.cummax() - 1).min()
-    calmar   = ann_ret / abs(mdd) if mdd < 0 else np.nan
-    win_rate = (rets > 0).mean()
-    avg_win  = rets[rets > 0].mean() if (rets > 0).any() else 0
-    avg_loss = rets[rets < 0].mean() if (rets < 0).any() else 0
-    alpha    = np.nan
-    if bench_rets is not None:
-        aligned = rets.align(bench_rets, join="inner")
-        if len(aligned[0]) > 12:
-            cov   = np.cov(aligned[0], aligned[1])
-            beta  = cov[0,1] / cov[1,1] if cov[1,1] > 0 else np.nan
-            alpha = (ann_ret - beta * bench_rets.mean()*12) if not np.isnan(beta) else np.nan
-    return dict(ann_ret=ann_ret, ann_vol=ann_vol, sharpe=sharpe, sortino=sortino,
-                mdd=mdd, calmar=calmar, win_rate=win_rate, avg_win=avg_win,
-                avg_loss=avg_loss, alpha=alpha)
+# compute_hf_metrics: src/portfolio.py (Sharpe/Sortino in excess of the T-bill rate)
 
 # ── Chart helpers ─────────────────────────────────────────────────────
 def area(df, col, title, color="#38bdf8", ytitle="Value"):
@@ -676,8 +667,17 @@ with st.sidebar:
         d_end   = st.date_input("End",   value=date.today(),   max_value=date.today())
     st.markdown("---")
     st.markdown("**🎲 Monte Carlo**")
-    mc_mu  = st.slider("E[R] Annual (%)", -5, 30, 8)
-    mc_vol = st.slider("σ Annual (%)",     5, 40, 16)
+    mc_method = st.radio("Return model", ["Gaussian", "Bootstrap"], horizontal=True, key="mc_method",
+                         help="Gaussian: normal monthly returns from μ and σ below. "
+                              "Bootstrap: resample historical S&P 500 monthly returns (fat tails kept).")
+    if mc_method == "Gaussian":
+        mc_mu  = st.slider("E[R] Annual (%)", -5, 30, 8)
+        mc_vol = st.slider("σ Annual (%)",     5, 40, 16)
+        mc_block = 1
+    else:
+        mc_mu, mc_vol = 8, 16                     # unused by the bootstrap
+        mc_block = st.slider("Block length (months)", 1, 12, 3,
+                             help="Consecutive months drawn together; keeps volatility clustering.")
     mc_n   = st.selectbox("Paths", [1000,5000,10000], index=1)
     st.markdown("---")
     if _DL_OK:
@@ -735,7 +735,7 @@ def load_spy(start, end):
 
 try:
     spy_rets = load_spy(str(d_start), d_end)
-    m = compute_hf_metrics(df["sp500_ret_m"].dropna(), spy_rets)
+    m = compute_hf_metrics(df["sp500_ret_m"].dropna(), spy_rets, rf=rf_monthly(df_raw))
 except Exception as e:
     spy_rets = pd.Series(dtype=float)
     m = dict(ann_ret=0, ann_vol=0, sharpe=np.nan, sortino=np.nan,
@@ -1392,12 +1392,21 @@ with tab7:
     render_methodology("risk_sim", st)
 
     @st.cache_data(ttl=3600, show_spinner=False)
-    def run_mc(mu, vol, n, h=12):
-        rng = np.random.default_rng(99)
-        shocks = rng.normal(mu/12, vol/np.sqrt(12), (n, h))
-        return np.exp(np.cumsum(shocks, axis=1))
+    def run_mc(mu, vol, n, method, block, _hist, hist_key, h=12):
+        return run_monte_carlo(mu, vol, n, h, method=method, hist_rets=_hist, block=block)
 
-    paths = run_mc(mc_mu/100, mc_vol/100, mc_n)
+    _hist = df_raw["sp500_ret_m"].dropna()
+    if mc_method == "Bootstrap" and len(_hist) >= 24 and not bool(df_raw["_is_demo"].iloc[-1]):
+        paths = run_mc(0.0, 0.0, mc_n, MC_BOOTSTRAP, mc_block, _hist, (str(_hist.index[-1]), len(_hist)))
+        _h_mu, _h_vol = _hist.mean() * 12 * 100, _hist.std() * np.sqrt(12) * 100
+        mc_title = (f"Monte Carlo Fan — bootstrap of {len(_hist)} months "
+                    f"{_hist.index[0]:%Y-%m}…{_hist.index[-1]:%Y-%m}, {mc_block}-month blocks "
+                    f"(hist μ={_h_mu:.1f}% σ={_h_vol:.1f}%, {mc_n:,} paths)")
+    else:
+        if mc_method == "Bootstrap":
+            st.warning("Not enough historical returns for a bootstrap — showing the Gaussian model.")
+        paths = run_mc(mc_mu/100, mc_vol/100, mc_n, MC_GAUSSIAN, 1, None, None)
+        mc_title = f"Monte Carlo Fan — Gaussian μ={mc_mu}% σ={mc_vol}% ({mc_n:,} paths)"
     p10,p25,p50,p75,p90 = [np.percentile(paths,q,axis=0) for q in [10,25,50,75,90]]
     x = list(range(1, 13))
     fig = go.Figure()
@@ -1410,7 +1419,7 @@ with tab7:
     fig.add_trace(go.Scatter(x=x, y=p50, mode="lines",
                              line=dict(color="#38bdf8",width=2.5), name="Median"))
     fig.add_hline(y=1.0,line_dash="dot",line_color="#475569",annotation_text="Start")
-    fig.update_layout(title=f"Monte Carlo Fan — μ={mc_mu}% σ={mc_vol}% ({mc_n:,} paths)",
+    fig.update_layout(title=mc_title,
                       hovermode="x unified", **PT)
     update_axes(fig, "Months Forward", "Cumulative Multiplier")
     fig.update_xaxes(tickprefix="M")
@@ -1418,7 +1427,7 @@ with tab7:
 
     with st.expander("ℹ️ How to read Monte Carlo simulations"):
         st.write("""
-        * **Monte Carlo Fan**: Shows thousands of possible future price paths based on your chosen return (μ) and volatility (σ).
+        * **Monte Carlo Fan**: Shows thousands of possible future price paths. *Gaussian* draws normal monthly returns from your chosen return (μ) and volatility (σ); *Bootstrap* resamples actual S&P 500 monthly returns since 2005 in blocks, so crash months like Oct 2008 and Mar 2020 appear at their historical frequency (fatter left tail than the normal model).
         * **Median (P50)**: The middle path; 50% of simulations ended above this, and 50% below.
         * **P10–P90 (Outer Band)**: Shows the range where 80% of all simulated outcomes fell.
         * **VaR 95% (Value at Risk)**: The threshold where there is only a 5% chance of doing worse. It represents your 'likely' worst-case monthly return.
@@ -1514,14 +1523,14 @@ with tab8:
 
 ### Risk Metrics
 - Annualized Return ({d_start} to {d_end}): {m['ann_ret']*100:.1f}%
-- Sharpe Ratio: {m['sharpe']:.2f}
+- Sharpe Ratio (excess of 3M T-bill): {m['sharpe']:.2f}
 - Sortino Ratio: {'{:.2f}'.format(m['sortino']) if np.isfinite(m['sortino']) else 'N/A'}
 - Max Drawdown: {m['mdd']*100:.1f}%
 - Calmar Ratio: {'{:.2f}'.format(m['calmar']) if np.isfinite(m['calmar']) else 'N/A'}
 - Win Rate: {m['win_rate']*100:.0f}%
 
 ### Yield Curve
-- Yield Curve Slope: {latest_data['yc_slope']*100:.2f}% ({'Inverted - recession signal' if latest_data['yc_slope'] < 0 else 'Normal'})
+- Yield Curve Slope (10Y-2Y): {latest_data['yc_slope']*100:.2f}% ({'Inverted - recession signal' if latest_data['yc_slope'] < 0 else 'Normal'})
 - Credit Spread (BAA-AAA): {latest_data['credit_spread']*100:.2f}%
 
 ### Momentum
@@ -2148,53 +2157,7 @@ with tab9:
 # ══════════════════════════════════════════════════════════════════════
 # Strategy Backtest engine — regime-gated SPY/cash with no-lookahead lag
 # ══════════════════════════════════════════════════════════════════════
-def run_strategy_backtest(macro_df: pd.DataFrame, *, use_regime: bool, use_momentum: bool,
-                          use_trend: bool, threshold: float, cost_bps: float,
-                          allow_short: bool):
-    """Walk-forward, no-lookahead backtest of an SPY/cash (or SPY/-SPY) strategy.
-
-    Position is decided from data observable at month T, then applied to the
-    realised return from T to T+1 via .shift(1). Net returns include linear
-    transaction costs proportional to turnover.
-    """
-    out = macro_df.copy()
-    out = out.dropna(subset=["sp500_ret_m"])
-
-    # signals (each ∈ {0,1}, evaluated at month T)
-    out["sig_regime"]   = (out["regime"] != "Risk-Off 🔴").astype(int)
-    out["sig_momentum"] = (out["momentum_12_1"] > 0).astype(int)
-    sma_10m = out["sp500"].rolling(10).mean()
-    out["sig_trend"]    = (out["sp500"] > sma_10m).astype(int)
-
-    cols = []
-    if use_regime:   cols.append("sig_regime")
-    if use_momentum: cols.append("sig_momentum")
-    if use_trend:    cols.append("sig_trend")
-
-    if not cols:
-        out["sig_score"] = 1.0
-    else:
-        out["sig_score"] = out[cols].mean(axis=1)
-
-    in_market = (out["sig_score"] >= threshold).astype(float)
-    if allow_short:
-        out_market = -1.0 * (out["sig_score"] < (1 - threshold)).astype(float)
-        target_w = in_market + out_market
-    else:
-        target_w = in_market
-
-    out["target_w"] = target_w
-    out["position"] = out["target_w"].shift(1).fillna(0.0)        # NO-LOOKAHEAD
-    out["turnover"] = out["position"].diff().abs().fillna(out["position"].abs())
-
-    cost = (cost_bps / 10000.0) * out["turnover"]
-    out["strat_ret_gross"] = out["position"] * out["sp500_ret_m"]
-    out["strat_ret"]       = out["strat_ret_gross"] - cost
-    out["strat_equity"]    = np.exp(out["strat_ret"].fillna(0.0).cumsum()) * 100
-    out["bh_equity"]       = np.exp(out["sp500_ret_m"].fillna(0.0).cumsum()) * 100
-    out["strat_dd"]        = out["strat_equity"] / out["strat_equity"].cummax() - 1
-    out["bh_dd"]           = out["bh_equity"]    / out["bh_equity"].cummax()    - 1
-    return out
+# run_strategy_backtest: src/portfolio.py (cash leg earns the T-bill rate)
 
 # ─── Tab 10: Strategy Backtest ────────────────────────────────────────
 with tab10:
@@ -2215,7 +2178,8 @@ with tab10:
 
     st.info("📐 **Construction**: at month *T* the engine reads only data observable at *T*, "
             "then holds the position through month *T+1*. Position lag = 1 month "
-            "(no-lookahead). Cash leg earns 0%. Net = gross − bps × turnover.")
+            "(no-lookahead). Cash leg earns the 3-month T-bill rate quoted at *T*. "
+            "Net = gross − bps × turnover. Sharpe/Sortino are measured in excess of the T-bill rate.")
 
     cfg1, cfg2 = st.columns([3, 2])
     with cfg1:
@@ -2235,12 +2199,14 @@ with tab10:
                                use_trend=use_tr, threshold=thr, cost_bps=cost_bps,
                                allow_short=allow_short)
 
+    if not bt.attrs.get("cash_rate", "").startswith("3-month"):
+        st.warning("T-bill data unavailable — the cash leg earns 0% and Sharpe/Sortino use a 0% risk-free rate.")
     if bt["strat_ret"].dropna().empty:
         st.error("No data after filters — widen the date range or relax the threshold.")
     else:
         # Tear-sheet metrics
-        m_strat = compute_hf_metrics(bt["strat_ret"].dropna(), bt["sp500_ret_m"].dropna())
-        m_bh    = compute_hf_metrics(bt["sp500_ret_m"].dropna())
+        m_strat = compute_hf_metrics(bt["strat_ret"].dropna(), bt["sp500_ret_m"].dropna(), rf=bt["rf_m"])
+        m_bh    = compute_hf_metrics(bt["sp500_ret_m"].dropna(), rf=bt["rf_m"])
         time_in = bt["position"].abs().mean() * 100
         n_flips = int((bt["position"].diff().abs() > 1e-9).sum())
 
@@ -2325,9 +2291,9 @@ with tab10:
         with st.expander("📖 Methodology & Caveats"):
             st.write("""
             * **No-lookahead**: positions decided at month T are applied to T+1 returns via `.shift(1)`.
-            * **Cash leg**: out-of-market periods earn 0%. Add T-bill yield in a future iteration.
+            * **Cash leg**: out-of-market periods earn the 3-month T-bill yield (^IRX) quoted at the start of the month (0% only if the T-bill series is unavailable).
             * **Costs**: linear in turnover; 5 bps ≈ retail SPY ETF round-trip.
-            * **Regime**: derived from credit-spread + realized-vol z-score (real BAA-AAA when FRED is reachable, proxy otherwise — see Macro & Rates tab).
+            * **Regime**: derived from credit-spread + realized-vol z-score (real FRED BAA-AAA spread; no proxy — months without FRED data are Unavailable).
             * **Regime filter is point-in-time**: the stress score uses expanding z-scores (data up to each month only) and fixed ±0.5 thresholds. Months before 36 months of history, or without FRED credit-spread data, are *Unavailable* and are not filtered. Remaining optimism: the thresholds and signal set were chosen with hindsight.
             """)
 

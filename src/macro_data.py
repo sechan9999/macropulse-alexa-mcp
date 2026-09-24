@@ -26,6 +26,7 @@ import pandas as pd
 import yfinance as yf
 
 from src.macro_model import add_regime, attach_credit_and_slope, is_fred_sourced, load_fred_credit_and_slope
+from src.portfolio import TBILL_COLUMN, TBILL_TICKER, compute_hf_metrics, rf_monthly  # noqa: F401 (re-export)
 
 try:
     from fredapi import Fred
@@ -126,7 +127,7 @@ def _load_macro_stored_copy():
 def load_macro() -> pd.DataFrame:
     """Pull S&P500, VIX, 10Y yield via BigQuery or yfinance fallback, with
     regime/regime_score columns. Mirrors app.py's load_macro() exactly."""
-    tmap = {"sp500": "^GSPC", "vix": "^VIX", "dgs10": "^TNX", "gold": "GLD", "oil": "USO"}
+    tmap = {"sp500": "^GSPC", "vix": "^VIX", "dgs10": "^TNX", TBILL_COLUMN: TBILL_TICKER, "gold": "GLD", "oil": "USO"}
     frames = {}
     for col, tkr in tmap.items():
         for attempt in range(3):
@@ -138,7 +139,13 @@ def load_macro() -> pd.DataFrame:
                 close = raw["Close"] if "Close" in raw.columns else raw.iloc[:, 0]
                 if isinstance(close, pd.DataFrame):
                     close = close.iloc[:, 0]
-                close = close.dropna().resample("ME").last()
+                close = close.dropna()
+                if col == "sp500":            # the real last trading day in each month (the as-of date)
+                    days = close.index.tz_localize(None) if close.index.tz is not None else close.index
+                    obs = pd.Series(days, index=close.index).resample("ME").last()
+                    obs.index = obs.index.to_period("M").to_timestamp()
+                    frames["_obs_date"] = obs
+                close = close.resample("ME").last()
                 close.index = close.index.to_period("M").to_timestamp()
                 frames[col] = close
                 break
@@ -168,6 +175,8 @@ def load_macro() -> pd.DataFrame:
     df["cumret"] = np.exp(df["sp500_ret_m"].cumsum()) * 100
     df["drawdown"] = df["cumret"] / df["cumret"].cummax() - 1
     df["dgs10"] = df["dgs10"].ffill()
+    if TBILL_COLUMN in df:
+        df[TBILL_COLUMN] = df[TBILL_COLUMN].ffill()
 
     fred_credit, fred_slope = _try_load_fred_series(df.index.min(), df.index.max())
     df = attach_credit_and_slope(df, fred_credit, fred_slope)   # no proxy: NaN when FRED is down
@@ -198,25 +207,5 @@ def load_spy(start: str, end: str) -> pd.Series:
         return pd.Series(dtype=float)
 
 
-def compute_hf_metrics(rets: pd.Series, bench_rets: Optional[pd.Series] = None) -> dict:
-    ann_ret = rets.mean() * 12
-    ann_vol = rets.std() * np.sqrt(12)
-    sharpe = ann_ret / ann_vol if ann_vol > 0 else np.nan
-    neg = rets[rets < 0]
-    sortino = ann_ret / (neg.std() * np.sqrt(12)) if len(neg) > 0 else np.nan
-    cum = np.exp(rets.cumsum())
-    mdd = (cum / cum.cummax() - 1).min()
-    calmar = ann_ret / abs(mdd) if mdd < 0 else np.nan
-    win_rate = (rets > 0).mean()
-    avg_win = rets[rets > 0].mean() if (rets > 0).any() else 0
-    avg_loss = rets[rets < 0].mean() if (rets < 0).any() else 0
-    alpha = np.nan
-    if bench_rets is not None:
-        aligned = rets.align(bench_rets, join="inner")
-        if len(aligned[0]) > 12:
-            cov = np.cov(aligned[0], aligned[1])
-            beta = cov[0, 1] / cov[1, 1] if cov[1, 1] > 0 else np.nan
-            alpha = (ann_ret - beta * bench_rets.mean() * 12) if not np.isnan(beta) else np.nan
-    return dict(ann_ret=ann_ret, ann_vol=ann_vol, sharpe=sharpe, sortino=sortino,
-                mdd=mdd, calmar=calmar, win_rate=win_rate, avg_win=avg_win,
-                avg_loss=avg_loss, alpha=alpha)
+# compute_hf_metrics lives in src/portfolio.py (one copy for the app, MCP tools and briefings);
+# it is re-exported here because callers import it from src.macro_data.
