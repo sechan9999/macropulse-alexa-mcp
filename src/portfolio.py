@@ -162,3 +162,20 @@ def run_monte_carlo(mu: float, vol: float, n: int, h: int = 12, *, method: str =
     else:
         raise ValueError(f"unknown Monte Carlo method: {method!r}")
     return np.exp(np.cumsum(shocks, axis=1))
+
+
+# ── Performance tab lines ──────────────────────────────────────────────────────
+def performance_lines(sp500: pd.Series, spy_rets: Optional[pd.Series] = None):
+    """(S&P 500 index, SPY index, S&P 500 drawdown) for the selected date range, both indices at 100
+    on the first month of the range. `sp500` is the month-end price level; `spy_rets` are SPY's monthly
+    log returns (row t = return into month t). The drawdown is measured from peaks inside the range,
+    matching the tear sheet's max drawdown."""
+    px = sp500.dropna()
+    sp5 = px / px.iloc[0] * 100
+    spy = pd.Series(dtype=float)
+    if spy_rets is not None and not spy_rets.dropna().empty:
+        r = spy_rets.dropna()
+        r = r[r.index > px.index[0]]
+        spy = pd.concat([pd.Series([100.0], index=[px.index[0]]), np.exp(r.cumsum()) * 100])
+    dd = sp5 / sp5.cummax() - 1
+    return sp5, spy, dd

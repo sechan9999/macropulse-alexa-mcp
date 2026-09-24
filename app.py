@@ -73,7 +73,7 @@ from src.macro_model import (
     missing_macro_fields,
 )
 from src.portfolio import (
-    MC_BOOTSTRAP, MC_GAUSSIAN, TBILL_COLUMN, TBILL_TICKER, compute_hf_metrics, rf_monthly,
+    MC_BOOTSTRAP, MC_GAUSSIAN, TBILL_COLUMN, TBILL_TICKER, compute_hf_metrics, performance_lines, rf_monthly,
     run_monte_carlo, run_strategy_backtest,
 )
 
@@ -821,15 +821,14 @@ with tab1:
     render_methodology("performance", st)
     # SPY overlay — fix #10
     spy_cum = load_spy(str(d_start), d_end)
-    spy_idx = np.exp(spy_cum.cumsum()) * 100
-    sp5_idx = df["cumret"]
+    sp5_idx, spy_idx, sp5_dd = performance_lines(df["sp500"], spy_cum)   # both = 100 at the Start month
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=sp5_idx.index, y=sp5_idx, name="S&P 500", mode="lines",
+    fig.add_trace(go.Scatter(x=sp5_idx.index, y=sp5_idx, name="S&P 500 (price)", mode="lines",
                              line=dict(color="#38bdf8",width=2), fill="tozeroy",
                              fillcolor="rgba(56,189,248,.06)"))
     if not spy_idx.empty:
-        fig.add_trace(go.Scatter(x=spy_idx.index, y=spy_idx, name="SPY (benchmark)",
+        fig.add_trace(go.Scatter(x=spy_idx.index, y=spy_idx, name="SPY (total return)",
                                  mode="lines", line=dict(color="#facc15",width=1.5,dash="dot")))
     fig.update_layout(title="Cumulative Return (Base=100)", hovermode="x unified", **PT)
     update_axes(fig, "Date", "Indexed Return")
@@ -837,14 +836,14 @@ with tab1:
 
     with st.expander("ℹ️ How to read Performance charts"):
         st.write("""
-        * **Cumulative Return**: Shows the growth of $100 invested at the start. Compare the blue line (S&P 500) vs the dashed yellow line (SPY) to see relative outperformance.
+        * **Cumulative Return**: Shows the growth of $100 invested at the Start date. The blue line is the S&P 500 price index; the dashed yellow line is SPY with dividends reinvested, so it ends higher by roughly the dividend yield (~1.5–2% a year).
         * **Rolling Drawdown**: Indicates the 'pain' of holding the asset. It shows the peak-to-trough decline. A drawdown of -20% means you lost 20% from the previous high.
         * **Return Distribution**: A histogram showing how frequent different monthly returns occur. A 'bell curve' shifted to the right is ideal.
         """)
 
     c1,c2 = st.columns(2)
     with c1:
-        dd = df["drawdown"] * 100
+        dd = sp5_dd * 100
         fig2 = go.Figure(go.Scatter(x=dd.index, y=dd, fill="tozeroy", mode="lines",
                                     line=dict(color="#f87171",width=1.5),
                                     fillcolor="rgba(248,113,113,.12)", name="Drawdown %"))
