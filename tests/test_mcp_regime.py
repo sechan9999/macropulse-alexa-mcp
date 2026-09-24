@@ -97,13 +97,30 @@ class TestFredCache(unittest.TestCase):
 
     def test_failure_is_not_retried_on_every_request(self):
         with mock.patch.object(srv, "load_fred_credit_and_slope", return_value=(None, None)) as load:
+            self.assertEqual(srv._cached_fred(block=True), (None, None))
             self.assertEqual(srv._cached_fred(), (None, None))
+            self.assertEqual(srv._cached_fred(block=True), (None, None))
+        self.assertEqual(load.call_count, 1)
+
+    def test_a_request_never_waits_on_fred(self):
+        """Empty cache: the request answers at once and the fetch runs in the background."""
+        def slow(*a, **k):
+            time.sleep(0.5)
+            return fake_fred()
+        with mock.patch.object(srv, "load_fred_credit_and_slope", side_effect=slow) as load:
+            t0 = time.perf_counter()
             self.assertEqual(srv._cached_fred(), (None, None))
+            self.assertLess(time.perf_counter() - t0, 0.1)
+            for _ in range(100):
+                if srv._fred_state["data"] is not None and not srv._fred_state["refreshing"]:
+                    break
+                time.sleep(0.02)
+            self.assertIsNotNone(srv._cached_fred()[0])                       # served once fetched
         self.assertEqual(load.call_count, 1)
 
     def test_stale_copy_is_served_while_refreshing(self):
         with mock.patch.object(srv, "load_fred_credit_and_slope", return_value=fake_fred()) as load:
-            first = srv._cached_fred()
+            first = srv._cached_fred(block=True)                              # start-up warm-up
             srv._fred_state["fetched_at"] -= srv._FRED_TTL_SECONDS + 60       # make it stale
             t0 = time.perf_counter()
             second = srv._cached_fred()

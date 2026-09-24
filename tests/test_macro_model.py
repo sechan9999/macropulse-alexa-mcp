@@ -82,11 +82,54 @@ class TestFredLoading(unittest.TestCase):
         self.assertEqual(list(s.values), [5.9, 6.1])
         self.assertEqual(s.index[0], pd.Timestamp("2024-01-01"))
 
+    def test_api_key_uses_the_official_api(self):
+        body = (b'{"observations": [{"date": "2024-01-01", "value": "5.9"},'
+                b' {"date": "2024-02-01", "value": "."}, {"date": "2024-03-01", "value": "6.1"}]}')
+        resp = mock.MagicMock()
+        resp.__enter__.return_value.read.return_value = body
+        with mock.patch("urllib.request.urlopen", return_value=resp) as op:
+            s = mm.fred_series("BAA", "2024-01-01", api_key="SECRETKEY")
+        url = op.call_args[0][0].full_url
+        self.assertTrue(url.startswith(mm.FRED_API_URL))
+        self.assertIn("series_id=BAA", url)
+        self.assertEqual(list(s.values), [5.9, 6.1])
+
+    def test_api_failure_falls_back_to_csv_and_never_logs_the_key(self):
+        csv = mock.MagicMock()
+        csv.__enter__.return_value.read.return_value = self.CSV
+
+        def urlopen(req, timeout=None):
+            if req.full_url.startswith(mm.FRED_API_URL):
+                raise OSError("Bad Request for key SECRETKEY")
+            return csv
+
+        with mock.patch("urllib.request.urlopen", side_effect=urlopen), \
+                self.assertLogs("src.macro_model", level="WARNING") as logs:
+            s = mm.fred_series("BAA", "2024-01-01", api_key="SECRETKEY")
+        self.assertEqual(list(s.values), [5.9, 6.1])
+        self.assertNotIn("SECRETKEY", "\n".join(logs.output))
+
     def test_unreachable_fred_returns_none_instead_of_a_proxy(self):
         with mock.patch("urllib.request.urlopen", side_effect=OSError("offline")):
             spread, slope = mm.load_fred_credit_and_slope("2020-01-01", "2024-01-01", api_key="")
         self.assertIsNone(spread)
         self.assertIsNone(slope)
+
+
+class TestFredFailureIsNotCached(unittest.TestCase):
+    def test_headless_pipeline_retries_after_the_backoff(self):
+        from src import macro_data
+        spread = pd.Series([1.0, 1.1], index=pd.date_range("2024-01-01", periods=2, freq="MS"))
+        results = [(None, None), (spread, spread)]
+        macro_data._fred_failed_at[0] = 0.0
+        with mock.patch.object(macro_data, "load_fred_credit_and_slope", side_effect=results) as load:
+            self.assertEqual(macro_data._try_load_fred_series("2031-01-01", "2031-02-01"), (None, None))
+            self.assertEqual(macro_data._try_load_fred_series("2031-01-01", "2031-02-01"), (None, None))
+            self.assertEqual(load.call_count, 1)                    # backing off, not hammering FRED
+            macro_data._fred_failed_at[0] = 0.0                     # five minutes later
+            got = macro_data._try_load_fred_series("2031-01-01", "2031-02-01")
+        self.assertIs(got[0], spread)                               # the failure was not cached for a day
+        self.assertEqual(load.call_count, 2)
 
 
 class TestExpectedReturnModel(unittest.TestCase):

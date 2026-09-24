@@ -46,7 +46,7 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 
 ### 2. 🌍 Macro & Rates
 * **10Y Treasury Yield (^TNX)**: The global discount rate driving equity duration and valuation multiples.
-* **Credit Spreads (BAA - AAA)**: Moody's corporate credit spread from FRED (API key, or FRED's keyless `fredgraph.csv` endpoint). If FRED is unreachable the series is shown as unavailable; no proxy is substituted.
+* **Credit Spreads (BAA - AAA)**: Moody's corporate credit spread from FRED (official API with `FRED_API_KEY`, falling back to the keyless `fredgraph.csv` endpoint). If FRED is unreachable the series is shown as unavailable; no proxy is substituted.
 * **Yield-Curve Slope (10Y - 2Y)**: Classic recession barometer tracking inversion and un-inversion phases.
 * **Realized Volatility Structure**: 3-Month vs. 12-Month realized volatility divergence indicating market regime stress.
 
@@ -199,7 +199,7 @@ The MCP server has its own image; build it from **`Dockerfile.mcp`** (the defaul
 docker build -f Dockerfile.mcp -t <account>.dkr.ecr.us-east-1.amazonaws.com/macropulse-alexa-mcp:<tag> .
 docker push <account>.dkr.ecr.us-east-1.amazonaws.com/macropulse-alexa-mcp:<tag>
 ```
-Set `SEC_USER_AGENT="Your Name you@example.com"` on the service (SEC fair-access policy); `FRED_API_KEY` is optional.
+Set `SEC_USER_AGENT="Your Name you@example.com"` on the service (SEC fair-access policy) and **`FRED_API_KEY`** ([free key](https://fredaccount.stlouisfed.org/apikeys)). FRED's keyless CSV endpoint can hang when called from cloud hosts; without FRED data the regime tools answer "unavailable" rather than guess.
 
 ---
 
@@ -297,7 +297,7 @@ Create `.streamlit/secrets.toml` or set environment variables:
 # Google Gemini API key (enables the AI Analyst tab):
 GEMINI_API_KEY = "your_google_gemini_api_key_here"
 
-# FRED API key (optional: without it the keyless fredgraph.csv endpoint is used):
+# FRED API key (free; strongly recommended on servers: the keyless fredgraph.csv fallback can hang from cloud hosts):
 FRED_API_KEY = "your_fred_api_key_here"
 
 # Optional Slack webhook URL for automated daily signals:
