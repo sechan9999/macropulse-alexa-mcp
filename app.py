@@ -67,6 +67,12 @@ except Exception as _e:
     _PDR_OK = False
     _import_errors["pandas-datareader"] = str(_e)
 
+from src.macro_model import (
+    RISK_ON, NEUTRAL, RISK_OFF, UNAVAILABLE, add_regime, attach_credit_and_slope,
+    expected_return_model, is_fred_sourced as _is_fred_sourced, load_fred_credit_and_slope,
+    missing_macro_fields,
+)
+
 try:
     from src.methodology import render as render_methodology
 except Exception as _e:
@@ -307,37 +313,9 @@ COLORS = ["#38bdf8","#818cf8","#34d399","#fb923c","#f472b6","#facc15","#a78bfa"]
 # ══════════════════════════════════════════
 @st.cache_data(ttl=86400, show_spinner=False)
 def _try_load_fred_series(start_ts, end_ts):
-    """Return (credit_spread_pct, yc_slope_pct) series from FRED if reachable,
-    else (None, None). credit_spread = BAA-AAA, slope = T10Y2Y. Both monthly.
-    Resilient: returns None on any failure so the proxy is used."""
-    try:
-        start = pd.Timestamp(start_ts) - pd.DateOffset(months=2)
-        end   = pd.Timestamp(end_ts)
-        key = _get_fred_key()
-        if key and _FREDAPI_OK:
-            fr = Fred(api_key=key)
-            baa = pd.Series(fr.get_series("BAA", observation_start=start, observation_end=end))
-            aaa = pd.Series(fr.get_series("AAA", observation_start=start, observation_end=end))
-            slope = pd.Series(fr.get_series("T10Y2Y", observation_start=start, observation_end=end))
-        elif _PDR_OK:
-            baa = pdr.DataReader("BAA", "fred", start, end).iloc[:, 0]
-            aaa = pdr.DataReader("AAA", "fred", start, end).iloc[:, 0]
-            slope = pdr.DataReader("T10Y2Y", "fred", start, end).iloc[:, 0]
-        else:
-            return None, None
-
-        spread = (baa - aaa).dropna()
-        spread.index = pd.to_datetime(spread.index)
-        slope.index  = pd.to_datetime(slope.index)
-        spread = spread.resample("ME").last()
-        slope  = slope.resample("ME").last()
-        spread.index = spread.index.to_period("M").to_timestamp()
-        slope.index  = slope.index.to_period("M").to_timestamp()
-        if spread.dropna().empty or slope.dropna().empty:
-            return None, None
-        return spread, slope
-    except Exception:
-        return None, None
+    """(credit_spread_pct, yc_slope_pct) monthly series from FRED (BAA-AAA, T10Y2Y), each None when
+    unreachable. Uses the API key when set, otherwise FRED's keyless fredgraph.csv endpoint."""
+    return load_fred_credit_and_slope(start_ts, end_ts, api_key=_get_fred_key())
 
 @st.cache_data(ttl=3600, show_spinner="📡 Fetching macro data…")
 def load_macro() -> pd.DataFrame:
@@ -346,12 +324,12 @@ def load_macro() -> pd.DataFrame:
         try:
             bq_df = load_macro_from_datalake()
             if bq_df is not None and not bq_df.empty and len(bq_df) > 100:
-                if "regime" not in bq_df.columns or "regime_score" not in bq_df.columns:
-                    cs = (bq_df["credit_spread"] - bq_df["credit_spread"].mean()) / bq_df["credit_spread"].std()
-                    rv = (bq_df["realized_vol_12m"] - bq_df["realized_vol_12m"].mean()) / bq_df["realized_vol_12m"].std()
-                    bq_df["regime_score"] = cs.fillna(0) + rv.fillna(0)
-                    bq_df["regime"] = np.select([bq_df["regime_score"]<-0.5, bq_df["regime_score"]>0.5],
-                                              ["Risk-On 🟢","Risk-Off 🔴"], default="Neutral 🟡")
+                # Older marts may hold the 10Y-yield proxy spreads and a full-history regime:
+                # refetch FRED when the stored series are not FRED, then recompute point-in-time.
+                if not (_is_fred_sourced(bq_df, "_credit_source") and _is_fred_sourced(bq_df, "_slope_source")):
+                    spread, slope = _try_load_fred_series(bq_df.index.min(), bq_df.index.max())
+                    bq_df = attach_credit_and_slope(bq_df, spread, slope)
+                bq_df = add_regime(bq_df)
                 bq_df["_data_source"] = "AWS S3"
                 return bq_df.dropna(subset=["sp500"])
         except Exception:
@@ -395,25 +373,11 @@ def load_macro() -> pd.DataFrame:
     df["drawdown"]         = df["cumret"] / df["cumret"].cummax() - 1
     df["dgs10"]            = df["dgs10"].ffill()
 
-    # Real FRED series when available; deterministic proxy otherwise.
+    # Real FRED series only: when FRED is unreachable the columns stay empty and the regime is
+    # reported as unavailable instead of being derived from a made-up spread.
     fred_credit, fred_slope = _try_load_fred_series(df.index.min(), df.index.max())
-    if fred_credit is not None:
-        df["credit_spread"] = fred_credit.reindex(df.index).ffill() / 100.0
-        df["_credit_source"] = "FRED:BAA-AAA"
-    else:
-        df["credit_spread"] = (df["dgs10"] * 0.35 + 1.5 - df["dgs10"] * 0.1).abs() / 100
-        df["_credit_source"] = "proxy"
-    if fred_slope is not None:
-        df["yc_slope"] = fred_slope.reindex(df.index).ffill() / 100.0
-        df["_slope_source"] = "FRED:T10Y2Y"
-    else:
-        df["yc_slope"]  = (df["dgs10"] - df["dgs10"] * 0.65) / 100
-        df["_slope_source"] = "proxy"
-    cs = (df["credit_spread"] - df["credit_spread"].mean()) / df["credit_spread"].std()
-    rv = (df["realized_vol_12m"] - df["realized_vol_12m"].mean()) / df["realized_vol_12m"].std()
-    df["regime_score"] = cs.fillna(0) + rv.fillna(0)
-    df["regime"] = np.select([df["regime_score"]<-0.5, df["regime_score"]>0.5],
-                              ["Risk-On 🟢","Risk-Off 🔴"], default="Neutral 🟡")
+    df = attach_credit_and_slope(df, fred_credit, fred_slope)
+    df = add_regime(df)   # point-in-time (expanding) z-scores
     df["_data_source"] = "Live yfinance"
     if _DL_OK:
         try:
@@ -784,13 +748,15 @@ c8.metric("Max DD",       f"{m['mdd']*100:.1f}%")
 
 # ── Regime banner ──────────────────────────────────────────────────────
 cr = df["regime"].iloc[-1]
+_score_now = df["regime_score"].iloc[-1]
+_score_txt = f"{_score_now:+.2f}" if pd.notna(_score_now) else "n/a (FRED credit-spread data unavailable)"
 bg = {"Risk-On 🟢":"#0d3320","Neutral 🟡":"#332e00","Risk-Off 🔴":"#3b0e0e"}.get(cr,"#131d35")
 bd = {"Risk-On 🟢":"#34d399","Neutral 🟡":"#facc15","Risk-Off 🔴":"#f87171"}.get(cr,"#38bdf8")
 st.markdown(f"""<div style="background:{bg}; border-left:4px solid {bd}; padding:12px 20px; 
 border-radius:8px; margin:12px 0; font-size:.95rem; color:#ffffff; font-weight:500; 
 box-shadow: 0 4px 15px rgba(0,0,0,0.3); display:flex; align-items:center;">
 <span style="opacity:0.9;">Current Regime:</span>&nbsp;<b style="color:{bd}; font-size:1.05rem;">{cr}</b> 
-&nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">Stress score:</span>&nbsp;<b>{df['regime_score'].iloc[-1]:+.2f}</b>
+&nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">Stress score:</span>&nbsp;<b>{_score_txt}</b>
 &nbsp;<span style="opacity:0.7; font-size:.8rem;">(credit + volatility z-score · below −0.5 Risk-On · above +0.5 Risk-Off)</span>
 &nbsp;&nbsp;|&nbsp;&nbsp; <span style="opacity:0.9;">as of</span>&nbsp;<b>{df.index[-1].strftime('%b %Y')}</b></div>""", unsafe_allow_html=True)
 
@@ -887,7 +853,7 @@ with tab2:
         fig.update_yaxes(ticksuffix="%")
         st.plotly_chart(fig, use_container_width=True)
     with c2:
-        fig = area(df,"credit_spread","Credit Spread (Proxy)",color="#fb923c", ytitle="Spread %")
+        fig = area(df,"credit_spread","Credit Spread (BAA-AAA, FRED)",color="#fb923c", ytitle="Spread %")
         fig.update_yaxes(tickformat=".2%")
         st.plotly_chart(fig, use_container_width=True)
     
@@ -909,13 +875,15 @@ with tab2:
         fig.update_yaxes(tickformat=".0%")
         st.plotly_chart(fig, use_container_width=True)
 
+    def _fmt(v, scale=1.0, fmt=".2f", unit="%"):
+        return f"{v*scale:{fmt}}{unit}" if pd.notna(v) else "— (unavailable)"
     latest = {
-        "10Y Yield":f"{last['dgs10']:.2f}%",
-        "Credit Spread":f"{last['credit_spread']*100:.2f}%",
-        "YC Slope":f"{last['yc_slope']*100:.2f}%",
-        "12M Vol":f"{last['realized_vol_12m']*100:.1f}%",
-        "Momentum":f"{last['momentum_12_1']*100:.2f}%",
-        "Regime Score":f"{last['regime_score']:.2f}",
+        "10Y Yield":_fmt(last['dgs10']),
+        "Credit Spread":_fmt(last['credit_spread'], 100),
+        "YC Slope":_fmt(last['yc_slope'], 100),
+        "12M Vol":_fmt(last['realized_vol_12m'], 100, ".1f"),
+        "Momentum":_fmt(last['momentum_12_1'], 100),
+        "Regime Score":_fmt(last['regime_score'], unit=""),
     }
     st.markdown("#### 📋 Latest Macro Snapshot")
     st.dataframe(pd.DataFrame(latest.items(), columns=["Indicator","Value"]),
@@ -926,7 +894,7 @@ with tab3:
     render_methodology("regime", st)
     # Color-coded price by regime — fix #12 (labeled by macro characteristics)
     # Color-coded price by regime
-    color_map = {"Risk-On 🟢":"#34d399","Neutral 🟡":"#facc15","Risk-Off 🔴":"#f87171"}
+    color_map = {RISK_ON:"#34d399", NEUTRAL:"#facc15", RISK_OFF:"#f87171", UNAVAILABLE:"#64748b"}
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df.index, y=df["sp500"], name="S&P 500",
                              mode="lines", line=dict(color="#475569",width=1)))
@@ -952,7 +920,7 @@ with tab3:
     with c1:
         rc = df["regime"].value_counts()
         fig2 = go.Figure(go.Pie(labels=rc.index, values=rc.values,
-                                marker_colors=["#34d399","#facc15","#f87171"], hole=.55))
+                                marker_colors=[color_map.get(r, "#64748b") for r in rc.index], hole=.55))
         fig2.update_layout(title="Sample Period Regime Distribution", **PT)
         st.plotly_chart(fig2, use_container_width=True)
     with c2:
@@ -980,40 +948,10 @@ with tab3:
 # ─── Tab 4: Expected Returns ─────────────────────────────────────────
 @st.cache_data(ttl=3600, show_spinner="🤖 Training expected return model…")
 def compute_expected_returns(df_hash: str, macro_data: pd.DataFrame):
-    """Expanding-window Ridge regression on yfinance macro data.
-    No FRED API or parquet files required.
-    """
-    from sklearn.linear_model import Ridge
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.pipeline import Pipeline
-
-    d = macro_data.copy()
-    # Forward 12m log return (target)
-    d["y_fwd_12m"] = d["sp500_ret_m"].rolling(12).sum().shift(-12)
-    X_cols = [c for c in ["dgs10","credit_spread","yc_slope",
-                           "realized_vol_12m","momentum_12_1","regime_score",
-                           "realized_vol_3m"] if c in d.columns]
-    d = d.dropna(subset=X_cols + ["y_fwd_12m","sp500_ret_m"])
-    if len(d) < 60:
-        return None
-
-    model = Pipeline([("sc", StandardScaler()), ("ridge", Ridge(alpha=5.0))])
-    preds = pd.Series(index=d.index, dtype=float)
-    errors = []
-    min_train = 48  # at least 4 years
-
-    for i in range(min_train, len(d)):
-        train = d.iloc[:i]
-        test  = d.iloc[i:i+1]
-        model.fit(train[X_cols], train["y_fwd_12m"])
-        pred = model.predict(test[X_cols])[0]
-        preds.iloc[i] = pred
-        errors.append(pred - train["y_fwd_12m"].iloc[-1])  # in-sample residual proxy
-
-    out = d.copy()
-    out["exp_ann_return"] = np.expm1(preds)   # log-return → simple annualized
-    out["pred_std"] = pd.Series(errors, dtype=float).rolling(24, min_periods=12).std().reindex(out.index)
-    return out[["exp_ann_return","sp500_ret_m","pred_std"]].dropna(subset=["exp_ann_return"])
+    """Point-in-time expanding-window Ridge forecast of the S&P 500 12m return (src/macro_model.py):
+    each month's model only sees 12m outcomes already realised at that month, the last row is
+    today's forecast, and pred_std is the std of realised out-of-sample errors."""
+    return expected_return_model(macro_data)
 
 with tab4:
     render_methodology("expected_returns", st)
@@ -1025,7 +963,8 @@ with tab4:
         try:
             raw = pd.read_parquet("exp_return_estimates.parquet")
             exp = raw[["exp_ann_return","sp500_ret_m"]].dropna()
-            exp["pred_std"] = exp["exp_ann_return"].rolling(12).std()
+            exp["realized_fwd_12m"] = np.expm1(exp["sp500_ret_m"].rolling(12).sum().shift(-12))
+            exp["pred_std"] = np.nan   # the offline file has no out-of-sample errors: no band
             source_label = "FRED macro model"
         except Exception:
             pass
@@ -1040,31 +979,34 @@ with tab4:
     exp_ok = exp is not None and not exp.empty and not exp["exp_ann_return"].dropna().empty
 
     if exp_ok:
-        roll_std = exp["pred_std"].fillna(exp["exp_ann_return"].rolling(12).std())
+        roll_std = exp["pred_std"]          # realised out-of-sample error std; NaN until known
         latest_pred = exp["exp_ann_return"].dropna().iloc[-1]
+        latest_date = exp["exp_ann_return"].dropna().index[-1]
 
         # KPI row
         c1, c2, c3 = st.columns(3)
-        c1.metric("📌 12M Prediction", f"{latest_pred*100:.1f}%")
+        c1.metric("📌 12M Prediction", f"{latest_pred*100:.1f}%",
+                  help=f"Forecast made with data up to {latest_date:%b %Y} for the following 12 months.")
         c2.metric("Model", source_label)
         c3.metric("Data Points", f"{len(exp):,}")
 
         # Main chart with confidence band + realized
         fig = go.Figure()
-        upper = (exp["exp_ann_return"] + roll_std).ffill()
-        lower = (exp["exp_ann_return"] - roll_std).ffill()
-        fig.add_trace(go.Scatter(
-            x=list(exp.index) + list(exp.index[::-1]),
-            y=list(upper) + list(lower[::-1]),
-            fill="toself", fillcolor="rgba(56,189,248,.10)", line=dict(width=0),
-            name="±1σ Confidence Band", showlegend=True))
+        band = exp.assign(upper=exp["exp_ann_return"] + roll_std,
+                          lower=exp["exp_ann_return"] - roll_std).dropna(subset=["upper", "lower"])
+        if not band.empty:
+            fig.add_trace(go.Scatter(
+                x=list(band.index) + list(band.index[::-1]),
+                y=list(band["upper"]) + list(band["lower"][::-1]),
+                fill="toself", fillcolor="rgba(56,189,248,.10)", line=dict(width=0),
+                name="±1σ realised forecast error", showlegend=True))
         fig.add_trace(go.Scatter(
             x=exp.index, y=exp["exp_ann_return"],
             name="Model Predicted (12M)", line=dict(color="#38bdf8", width=2)))
-        realized = exp["sp500_ret_m"].rolling(12).sum()
+        realized = exp["realized_fwd_12m"]   # the 12 months each forecast was about (same date axis)
         fig.add_trace(go.Scatter(
             x=realized.index, y=realized,
-            name="Realized 12M Return", line=dict(color="#34d399", width=1.5, dash="dot")))
+            name="Realized next-12M Return", line=dict(color="#34d399", width=1.5, dash="dot")))
         fig.add_hline(y=0, line_dash="dot", line_color="#475569", annotation_text="Zero")
         fig.update_layout(
             title=f"Model-Implied Expected 12M Return — {source_label}",
@@ -1075,14 +1017,16 @@ with tab4:
 
         with st.expander("ℹ️ How to read predictive charts"):
             st.write("""
-            * **Model Predicted (12M)**: The central estimate from our Ridge regression model, forecasting the S&P 500's return over the next 12 months based on current macro features.
-            * **Realized 12M Return**: The actual trailing 12-month return of the S&P 500. This tracks how well the model performed in hindsight.
-            * **Confidence Band**: Represents ±1 standard deviation of historical model errors. When the green line stays within the blue shade, the model is performing within normal statistical bounds.
+            * **Model Predicted (12M)**: The forecast made at each month for the S&P 500's return over the following 12 months. Each month's model is trained only on months whose 12-month outcome was already known then (no look-ahead); the last point is today's forecast.
+            * **Realized next-12M Return**: What the S&P 500 actually returned over those same 12 months, plotted on the forecast date. It ends 12 months ago because later outcomes are not known yet.
+            * **Band**: ±1 standard deviation of the model's realised out-of-sample errors over the previous 24 forecasts, using only errors already known at each date.
             """)
 
         # Feature importance (last fitted coefficients)
         st.markdown("#### 🔬 Model Info")
-        st.caption("Expanding-window Ridge Regression | Min 48 months training | Features: yield, spread, vol, momentum, regime score")
+        st.caption("Expanding-window Ridge regression | refit monthly on outcomes realised by that month "
+                   "(12-month embargo) | min 48 training months | features: yield, spread, curve, vol, "
+                   "momentum, regime score")
     else:
         st.warning("Not enough data to compute expected return model. Try extending the date range.")
 
@@ -1507,7 +1451,11 @@ with tab8:
             bedrock_model = st.text_input("Bedrock model ID", value=BEDROCK_DEFAULT_MODEL, key="bedrock_model_id")
         provider_ready = _BOTO3_OK
 
-    if provider_ready:
+    _missing_macro = missing_macro_fields(df.iloc[-1])
+    if provider_ready and _missing_macro:
+        st.warning(f"Live macro data is incomplete ({', '.join(_missing_macro)} unavailable — FRED may be "
+                   "unreachable). AI analysis is paused rather than run on missing numbers.")
+    if provider_ready and not _missing_macro:
         # Build context from live data
         latest_data = df.iloc[-1]
         prev_data   = df.iloc[-2] if len(df) > 1 else df.iloc[-1]
@@ -1540,7 +1488,7 @@ with tab8:
 
 ### Yield Curve
 - Yield Curve Slope: {latest_data['yc_slope']*100:.2f}% ({'Inverted - recession signal' if latest_data['yc_slope'] < 0 else 'Normal'})
-- Credit Spread Proxy: {latest_data['credit_spread']*100:.2f}%
+- Credit Spread (BAA-AAA): {latest_data['credit_spread']*100:.2f}%
 
 ### Momentum
 - 12-1 Momentum Signal: {latest_data['momentum_12_1']*100:.2f}%
@@ -2346,11 +2294,11 @@ with tab10:
             * **Cash leg**: out-of-market periods earn 0%. Add T-bill yield in a future iteration.
             * **Costs**: linear in turnover; 5 bps ≈ retail SPY ETF round-trip.
             * **Regime**: derived from credit-spread + realized-vol z-score (real BAA-AAA when FRED is reachable, proxy otherwise — see Macro & Rates tab).
-            * **Sample bias**: regime thresholds are calibrated on the full history, so the in-sample edge is optimistic. Use `Walk-forward` Ridge model in Tab 4 for a stricter test.
+            * **Regime filter is point-in-time**: the stress score uses expanding z-scores (data up to each month only) and fixed ±0.5 thresholds. Months before 36 months of history, or without FRED credit-spread data, are *Unavailable* and are not filtered. Remaining optimism: the thresholds and signal set were chosen with hindsight.
             """)
 
-        st.caption(f"Credit spread source: **{df['_credit_source'].iloc[-1] if '_credit_source' in df.columns else 'proxy'}**"
-                   f" · Yield curve source: **{df['_slope_source'].iloc[-1] if '_slope_source' in df.columns else 'proxy'}**")
+        st.caption(f"Credit spread source: **{df['_credit_source'].iloc[-1] if '_credit_source' in df.columns else 'unavailable'}**"
+                   f" · Yield curve source: **{df['_slope_source'].iloc[-1] if '_slope_source' in df.columns else 'unavailable'}**")
 
 # ─── Tab 11: Quant Signals (volatility-aware technical recommendations) ─────
 @st.cache_data(ttl=900, show_spinner="⚡ Scanning volatility + technical signals…")

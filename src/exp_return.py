@@ -22,8 +22,10 @@ def train_regime_conditional_alpha(X: pd.DataFrame, y: pd.DataFrame, regime_prob
     models = {k: {a: Pipeline([("sc",StandardScaler()),("rg",Ridge(alpha=alpha))]) for a in assets} for k in range(nR)}
     exp = pd.DataFrame(index=data.index, columns=assets, dtype=float)
 
-    for t in range(min_train, len(data)):
-        train = data.iloc[:t]
+    # y at row j is the return over rows j+1 .. j+horizon, so it is only known from row j+horizon on.
+    # Train row t's models on rows < t - horizon: every target they use is realised by row t.
+    for t in range(min_train + horizon, len(data)):
+        train = data.iloc[:t - horizon]
         test = data.iloc[t:t+1]
 
         # per regime per asset

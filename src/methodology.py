@@ -58,7 +58,7 @@ $$\beta = \frac{\mathrm{Cov}(r_p, r_b)}{\mathrm{Var}(r_b)}, \qquad \alpha = \mu_
         "title": "🌍 Macro & Rates — Methodology",
         "chart": """
 * **10Y Treasury Yield** — the global discount rate. Rising yields mechanically compress duration-sensitive equities (long-duration tech, REITs, utilities) and lift the bar for any cash flow far in the future.
-* **Credit Spread** — extra yield corporates pay over Treasuries. Spike = stress, compression = complacency. This dashboard pulls real BAA-AAA from FRED when available, otherwise a 10Y-derived proxy (footer indicates source).
+* **Credit Spread** — extra yield corporates pay over Treasuries. Spike = stress, compression = complacency. This dashboard uses Moody's BAA-AAA from FRED. If FRED is unreachable the regime is shown as unavailable; no proxy is substituted.
 * **Yield-Curve Slope (10Y - 2Y)** — recession barometer. Inversion (negative) historically precedes recessions by 6-18 months.
 * **Realized Volatility (3M vs 12M)** — when 3M crosses above 12M, regime is unstable.
 """,
@@ -76,7 +76,8 @@ $$\text{CS} = y_{\text{BAA}} - y_{\text{AAA}} \quad\text{or}\quad y_{\text{BAA}}
 $$r_{\text{real}} = y_{\text{nom}} - \pi^{e}$$
 
 **Macro Stress Score** (this dashboard)
-$$\text{MSS}_t = z(\text{CS})_t + z(\sigma_{rv,12})_t, \qquad z(x)_t = \frac{x_t - \bar x}{s_x}$$
+$$\text{MSS}_t = z(\text{CS})_t + z(\sigma_{rv,12})_t, \qquad z(x)_t = \frac{x_t - \bar x_{\le t}}{s_{x,\le t}}$$
+Mean and std are *expanding* (data up to $t$ only, at least 36 months), so a past date's regime never uses later data.
 
 **Bond convexity** (sensitivity-of-sensitivity, why long bonds whip)
 $$C = \frac{1}{P}\frac{\partial^{2}P}{\partial y^{2}}, \qquad \Delta P \approx -D\,\Delta y + \tfrac{1}{2} C\,(\Delta y)^{2}$$
@@ -131,8 +132,8 @@ $$\text{SR}_{R_k} = \frac{E[r_t \mid R_t = k] \cdot 12}{\sigma[r_t \mid R_t = k]
         "title": "🤖 Expected Returns — Methodology",
         "chart": """
 * **Predicted vs Realised 12M Return** — the model's forecast against what actually happened. Tracking is what matters; level isn't.
-* **±1σ Confidence Band** — uncertainty around the prediction (residual standard error). When realised falls outside the band repeatedly, the model is mis-specified.
-* **Walk-forward Construction** — at every month *T*, the model is retrained on data ≤ *T*, then asked to predict *T+1...T+12*. No future leakage.
+* **±1σ Band** — std of the model's realised out-of-sample errors over the previous 24 forecasts, using only errors already known at each date. When realised returns keep falling outside it, the model is mis-specified.
+* **Walk-forward Construction** — at every month *T*, the model is retrained only on months whose 12-month outcome is already known at *T* (targets ending by *T*; the last 12 months are embargoed), then predicts *T+1...T+12*. The last point is today's forecast. A CI test checks that the model shows no skill on pure-noise returns.
 """,
         "math": r"""
 **Ridge regression** (L2-regularised least squares; the workhorse of factor models)
@@ -144,7 +145,7 @@ $$\hat\beta = (X^{\top}X + \lambda I)^{-1} X^{\top} y$$
 $$y_{t,12} = \log\!\bigl(P_{t+12}/P_t\bigr) = \sum_{i=1}^{12} r_{t+i}$$
 
 **Expanding-window walk-forward** (the protocol)
-$$\hat\beta_t = f\bigl(\{(X_s, y_s) : s \le t - 12\}\bigr) \quad\Rightarrow\quad \hat y_{t} = X_t \hat\beta_t$$
+$$\hat\beta_t = f\bigl(\{(X_s, y_s) : s < t - 12\}\bigr) \quad\Rightarrow\quad \hat y_{t} = X_t \hat\beta_t$$
 
 **Information Coefficient (IC)** — predictive correlation
 $$\text{IC} = \mathrm{corr}(\hat y_t,\, y_t)$$

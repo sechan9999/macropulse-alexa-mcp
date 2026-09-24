@@ -12,6 +12,8 @@ FireTvDataUnavailable (served as HTTP 503) — never made-up numbers.
 """
 from __future__ import annotations
 
+import pandas as pd
+
 from src.macro_data import _ttl_cache, load_macro
 from src.quant_signals import DEFAULT_UNIVERSE, run_quant_scan
 from src.macro_extras import summarize_nvda_danger_zone
@@ -37,6 +39,11 @@ def regime_payload() -> dict:
         raise FireTvDataUnavailable("Live macro data is unavailable (only the offline demo frame loaded).")
     last = df.iloc[-1]
     prev = df.iloc[-2] if len(df) > 1 else last
+    needed = ["regime_score", "sp500", "dgs10", "yc_slope", "credit_spread", "realized_vol_12m"]
+    missing = [c for c in needed if c not in df.columns or pd.isna(last[c])]
+    if missing:
+        # e.g. FRED unreachable: the regime is unavailable rather than computed from a made-up spread.
+        raise FireTvDataUnavailable(f"Live macro data is incomplete ({', '.join(missing)} unavailable).")
     return {
         "as_of": df.index[-1].strftime("%Y-%m-%d"),
         "regime": last["regime"],
