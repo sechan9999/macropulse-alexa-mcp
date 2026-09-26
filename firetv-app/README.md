@@ -1,5 +1,7 @@
 # ⚡ Macro Pulse — Fire TV Companion View
 
+**Live on the Amazon Appstore:** [https://www.amazon.com/gp/product/B0HKWHFJSS](https://www.amazon.com/gp/product/B0HKWHFJSS)
+
 A glanceable Fire TV companion app for [Macro Pulse](../README.md): today's macro
 regime, key market stats, an NVDA danger-zone reading, and your watchlist
 signals — visible on the living-room TV without opening a laptop or phone.

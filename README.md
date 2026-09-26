@@ -2,6 +2,7 @@
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://hf-macro-dashboard.streamlit.app/)
 [![Google Cloud Run](https://img.shields.io/badge/Google%20Cloud%20Run-Live-4285F4?logo=google-cloud&logoColor=white)](https://macro-pulse-652787573242.us-central1.run.app)
+[![Amazon Appstore](https://img.shields.io/badge/Amazon%20Appstore-Fire%20TV%20app%20live-FF9900?logo=amazon&logoColor=white)](https://www.amazon.com/gp/product/B0HKWHFJSS)
 [![AWS S3](https://img.shields.io/badge/AWS%20S3-Data%20Lake-569A31?logo=amazons3&logoColor=white)](https://aws.amazon.com/s3/)
 [![Tests](https://github.com/sechan9999/macropulse-alexa-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/sechan9999/macropulse-alexa-mcp/actions/workflows/tests.yml)
 [![Daily Quant Signal](https://github.com/sechan9999/macropulse-alexa-mcp/actions/workflows/daily-quant-signal.yml/badge.svg)](https://github.com/sechan9999/macropulse-alexa-mcp/actions/workflows/daily-quant-signal.yml)
@@ -14,9 +15,9 @@
 
 * a **14-tab Streamlit dashboard** ([hf-macro-dashboard.streamlit.app](https://hf-macro-dashboard.streamlit.app/));
 * a self-hosted **MCP server for Alexa+** on Amazon ECS (9 tools over Streamable HTTP);
-* a **Fire TV app** (Expo + react-native-tvos) that reads the same AWS endpoint.
+* a **Fire TV app** (Expo + react-native-tvos) that reads the same AWS endpoint, **live on the [Amazon Appstore](https://www.amazon.com/gp/product/B0HKWHFJSS)**.
 
-**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 191 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns.
+**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 195 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns.
 
 Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **scikit-learn**, **AWS (ECS, ECR, S3, Bedrock)** and **Google Gemini**.
 
@@ -141,7 +142,7 @@ The platform is structured into 14 dedicated analytical tabs, each equipped with
 
 ## 📺 Amazon Fire TV App
 
-The Fire TV companion app lives in [`firetv-app/`](firetv-app/) (Expo + react-native-tvos, built as an APK with EAS Build) and has been submitted to the Amazon Appstore for Fire TV.
+The Fire TV companion app lives in [`firetv-app/`](firetv-app/) (Expo + react-native-tvos, built as an APK with EAS Build) and is **live on the Amazon Appstore for Fire TV**: [https://www.amazon.com/gp/product/B0HKWHFJSS](https://www.amazon.com/gp/product/B0HKWHFJSS) (version 1.0.2).
 * **What it shows**: macro regime card, S&P 500, 10-year yield, curve slope, 12-month realised vol, the NVDA danger index and watchlist signals, refreshed every 5 minutes. No sign-in.
 * **Data**: the same AWS endpoint as the MCP server (`/api/regime`, `/api/watchlist-signals`, `/api/nvda-danger`). When live data is incomplete the API returns 503 and the app shows an error instead of placeholder numbers. `as_of` is the date of the latest S&P 500 close, not the start of the month.
 * **10-foot UI**: D-pad navigation with a collapsible side menu and visible focus outlines.
