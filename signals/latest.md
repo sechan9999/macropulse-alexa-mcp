@@ -1,25 +1,27 @@
 ⚡ Macropulse Quant Signals — Daily Recommendation (참고용, 매매 지시 아님)
 
 🟢 BUY 후보 (8)
-  · XOM    $172.15  score +45  [Normal]
+  · XOM    $174.19  score +45  [Normal]
       정배열 상승추세 (가격>20>50>200일선) · MACD 히스토그램 확대 (상승 모멘텀 가속) · RSI 84 과매수 구간 · 변동성 스퀴즈 이후 상단 돌파 (매수 방향 변동성 확장)
-  · PG     $153.20  score +45  [Normal]
+  · PG     $153.04  score +45  [Normal]
       50일선 위에서 거래 중 (단기 우위) · MACD 히스토그램 확대 (상승 모멘텀 가속) · 변동성 스퀴즈 이후 상단 돌파 (매수 방향 변동성 확장)
-  · WMT    $113.08  score +45  [Normal]
-      50일선 위에서 거래 중 (단기 우위) · MACD 히스토그램 확대 (상승 모멘텀 가속) · 변동성 스퀴즈 이후 상단 돌파 (매수 방향 변동성 확장)
-  · GOOGL  $352.72  score +40  [Low (squeeze)]
+  · AAPL   $342.95  score +40  [Low (squeeze)]
       정배열 상승추세 (가격>20>50>200일선) · MACD 히스토그램 확대 (상승 모멘텀 가속)
-  · QQQ    $746.04  score +25  [Normal]
+  · MSFT   $546.51  score +25  [Low (squeeze)]
+      정배열 상승추세 (가격>20>50>200일선) · MACD 히스토그램 확대 (상승 모멘텀 가속) · RSI 79 과매수 구간
+  · SPY    $777.79  score +25  [Low (squeeze)]
       정배열 상승추세 (가격>20>50>200일선)
-  · SPY    $778.10  score +25  [Low (squeeze)]
-      정배열 상승추세 (가격>20>50>200일선)
-  · MSFT   $541.15  score +25  [Normal]
-      정배열 상승추세 (가격>20>50>200일선) · MACD 히스토그램 확대 (상승 모멘텀 가속) · RSI 78 과매수 구간
-  · AMZN   $259.53  score +25  [Normal]
+  · GOOGL  $353.16  score +25  [Low (squeeze)]
+      정배열 상승추세 (가격>20>50>200일선) · MACD 히스토그램 확대 (상승 모멘텀 가속) · RSI 70 과매수 구간
+  · CVX    $217.97  score +25  [Normal]
+      정배열 상승추세 (가격>20>50>200일선) · MACD 히스토그램 확대 (상승 모멘텀 가속) · RSI 75 과매수 구간
+  · WMT    $113.38  score +25  [Normal]
       50일선 위에서 거래 중 (단기 우위) · MACD 히스토그램 확대 (상승 모멘텀 가속)
 
-🔴 SELL 후보 (1)
-  · GLD    $382.15  score -25  [Low (squeeze)]
+🔴 SELL 후보 (2)
+  · GLD    $381.26  score -25  [Low (squeeze)]
       역배열 하락추세 (가격<20<50<200일선)
+  · JNJ    $248.28  score -30  [Elevated]
+      50일선 아래에서 거래 중 (단기 열위) · MACD 히스토그램 확대 (하락 모멘텀 가속) · RSI 30 과매도 구간 · 변동성 스퀴즈 이후 하단 이탈 (매도 방향 변동성 확장)
 
 ※ 추천과 근거만 제공하며, 실제 주문은 본인이 직접 판단·실행하세요.
