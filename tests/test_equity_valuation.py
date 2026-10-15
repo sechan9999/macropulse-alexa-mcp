@@ -84,8 +84,27 @@ class TestSplitAdjustedEps(unittest.TestCase):
 
     def test_bundle_uses_ttm_eps(self):
         b = _fixture_bundle()
-        self.assertAlmostEqual(b["eps_ttm"], (30 + 17 - 14) / 1000.0)
+        self.assertAlmostEqual(b["eps_ttm"], (30 + 17 - 14) / (1000.0 * 1010 / 990))
         self.assertIn("10-Q", b["sources"][-1])
+
+
+class TestDilution(unittest.TestCase):
+    def test_latest_quarter_ratio(self):
+        f, period = data_us.dilution_factor(synthetic.company_facts_fixture())
+        self.assertAlmostEqual(f, 1010 / 990)                       # 3-month Q2 FY26, not the 6-month YTD
+        self.assertEqual(period, "2025-12-28 to 2026-03-28")
+
+    def test_missing_counts_mean_no_dilution(self):
+        self.assertEqual(data_us.dilution_factor({"facts": {"us-gaap": {}}}), (1.0, None))
+
+    def test_per_share_values_use_diluted_shares_and_market_cap_basic(self):
+        b = _fixture_bundle()
+        v = dcf.build(b)
+        self.assertAlmostEqual(b["shares_diluted"], 1000 * 1010 / 990)
+        self.assertAlmostEqual(v["inputs"]["shares"], b["shares_diluted"])
+        self.assertAlmostEqual(v["base"]["per_share"], v["base"]["equity"] / b["shares_diluted"])
+        self.assertAlmostEqual(v["market_cap"], b["last_price"] * 1000)
+        self.assertEqual(dcf.build(synthetic.stock_bundle())["assumptions"]["dilution_factor"], 1.0)
 
 
 class TestDcfMechanics(unittest.TestCase):
@@ -202,6 +221,7 @@ class TestExcelOnTtm(unittest.TestCase):
         for i, x in enumerate(v["fomc_overlay"]):
             self.assertAlmostEqual(wb["Sensitivity"][f"H{19 + i}"].value, x["per_share"], places=6)
         self.assertEqual(wb["Financials"]["A27"].value, "FCFF (CFO - CapEx + interest x (1 - tax))")
+        self.assertAlmostEqual(wb["Assumptions"]["B40"].value, v["inputs"]["shares"], places=6)
 
 
 if __name__ == "__main__":

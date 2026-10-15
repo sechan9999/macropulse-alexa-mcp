@@ -124,6 +124,12 @@ def company_facts_fixture() -> dict:
             "LongTermDebtCurrent": {"units": {"USD": [ins("2025-09-27", 5.0, "2025-11-03"),
                                                        ins("2026-03-28", 4.0, **q)]}},
             "CommercialPaper": {"units": {"USD": [ins("2025-09-27", 2.0, "2025-11-03")]}},
+            "WeightedAverageNumberOfSharesOutstandingBasic": {"units": {"shares": [
+                dur("2024-09-29", "2025-09-27", 1000.0, "2025-11-03"),
+                dur("2025-12-28", "2026-03-28", 990.0, **q), dur(*ytd, 995.0, **q)]}},
+            "WeightedAverageNumberOfDilutedSharesOutstanding": {"units": {"shares": [
+                dur("2024-09-29", "2025-09-27", 1015.0, "2025-11-03"),
+                dur("2025-12-28", "2026-03-28", 1010.0, **q), dur(*ytd, 1012.0, **q)]}},
             "InterestExpense": {"units": {"USD": [dur("2024-09-29", "2025-09-27", 2.5, "2025-11-03"),
                                                   dur(*ytd, 1.4, **q), dur(*ytd_prev, 1.2, **q)]}},
         }}}

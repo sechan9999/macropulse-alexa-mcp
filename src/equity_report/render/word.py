@@ -204,6 +204,9 @@ def build(rep: Report, charts: dict[str, bytes]) -> bytes:
                                          else ", linear fade") + f" ({a['growth_source']})"],
         ["FCFF margin", f"{a['fcf_margin_used']:.1%} ({a['fcf_margin_source']}; FCFF = CFO - CapEx + interest x (1 - tax))"],
         ["Net debt", f"${(val['debt'] - val['cash']) / 1e6:,.0f}M (balance sheet {a['balance_sheet_date']})"],
+        ["Shares (per-share values)", f"{a['shares_diluted'] / 1e6:,.1f}M diluted = {a['shares_basic'] / 1e6:,.1f}M "
+                                      f"outstanding x {a['dilution_factor']:.4f}"
+                                      + (f" (diluted/basic, {a['dilution_period']})" if a.get("dilution_period") else "")],
         ["Reverse DCF (price-implied)",
          ("year-1 growth " + (f"{a['implied_growth']:.1%}" if a.get("implied_growth") is not None else "n/a")
           + ", WACC " + (f"{a['implied_wacc']:.2%}" if a.get("implied_wacc") is not None else "n/a"))],

@@ -323,6 +323,20 @@ def ttm(facts: dict, fin: pd.DataFrame) -> dict | None:
     return out
 
 
+def dilution_factor(facts: dict) -> tuple[float, str | None]:
+    """Diluted / basic weighted-average shares for the latest reported period (shortest period on the latest
+    end date, i.e. the last quarter when a 10-Q exists), clipped to 1.00-1.15. Applied to the current share
+    count to put RSUs and options into per-share values. (1.0, None) when either figure is missing."""
+    usgaap = facts.get("facts", {}).get("us-gaap", {})
+    dil = _durations(usgaap, "WeightedAverageNumberOfDilutedSharesOutstanding", "shares")
+    bas = _durations(usgaap, "WeightedAverageNumberOfSharesOutstandingBasic", "shares")
+    common = [k for k in dil if k in bas and bas[k] > 0]
+    if not common:
+        return 1.0, None
+    k = max(common, key=lambda k: (k[1], -(k[1] - k[0]).days))
+    return float(np.clip(dil[k] / bas[k], 1.0, 1.15)), f"{k[0].date()} to {k[1].date()}"
+
+
 # ─────────────────────────── prices (yfinance) ───────────────────────────
 def _yf_splits(ticker: str) -> pd.Series:
     import yfinance as yf
@@ -412,6 +426,8 @@ def load_bundle(ticker: str, years: int = 5, *, price_fetch: Callable[[str], pd.
     eps = eps_by_filing_date(facts, splits)
     fin = split_adjust_eps(fin, facts, splits)
     t12 = ttm(facts, fin)
+    dil, dil_period = dilution_factor(facts)
+    shares_diluted = shares * dil
     pe = None
     if len(eps):
         eps_asof = eps.reindex(close.index.union(eps.index)).ffill().reindex(close.index)
@@ -422,7 +438,8 @@ def load_bundle(ticker: str, years: int = 5, *, price_fetch: Callable[[str], pd.
         "prices": prices, "index": index, "financials": fin, "shares": shares,
         "last_price": float(close.iloc[-1]), "pe_history": pe,
         "eps_latest": float(eps.iloc[-1]) if len(eps) else None,
-        "ttm": t12, "eps_ttm": (t12["net_income"] / shares) if t12 and np.isfinite(t12["net_income"]) else None,
+        "ttm": t12, "eps_ttm": (t12["net_income"] / shares_diluted) if t12 and np.isfinite(t12["net_income"]) else None,
+        "dilution_factor": dil, "dilution_period": dil_period, "shares_diluted": shares_diluted,
         "splits_checked": splits is not None,
         "positioning": positioning(ticker) if with_positioning else None,
         "risk_free_live": risk_free,
