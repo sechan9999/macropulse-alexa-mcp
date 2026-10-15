@@ -234,6 +234,9 @@ def build(bundle: dict, a: DCFAssumptions | None = None, regime: RegimeOverlay |
                    if np.isfinite(t12.get("operating_cf", np.nan)) else np.nan)
         ttm_margin = ttm_fcf / base_rev if np.isfinite(ttm_fcf) else np.nan
         recent_growth = t12.get("ytd_growth", np.nan)
+        if t12.get("interest_expense_from_fy"):
+            notes.append("The 10-Q has no year-to-date interest expense under the 10-K's tags: the TTM FCFF "
+                         "adds back last fiscal year's interest instead.")
         growth_src = (f"revenue growth, {t12['ytd_months']}-month year-to-date vs same period last year (10-Q)"
                       if np.isfinite(recent_growth) else None)
     else:

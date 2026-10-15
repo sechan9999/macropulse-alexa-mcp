@@ -297,6 +297,12 @@ def ttm(facts: dict, fin: pd.DataFrame) -> dict | None:
                 break
     if not np.isfinite(out["revenue"]):
         return None
+    # Some filers tag interest differently in 10-Qs than in the 10-K (e.g. AVGO), so no tag has all
+    # three periods. Fall back to the last fiscal year's figure rather than adding back no interest.
+    out["interest_expense_from_fy"] = False
+    if not np.isfinite(out["interest_expense"]) and "interest_expense" in fin and pd.notna(fin["interest_expense"].iloc[-1]):
+        out["interest_expense"] = float(fin["interest_expense"].iloc[-1])
+        out["interest_expense_from_fy"] = True
     for key in TTM_INSTANTS:
         out[key] = np.nan
         for tag in TAGS[key]:
