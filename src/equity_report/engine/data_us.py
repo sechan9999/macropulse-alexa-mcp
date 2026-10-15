@@ -79,6 +79,7 @@ def company_facts(cik: str, http_get: Callable[[str], dict] | None = None) -> di
 
 # ─────────────────────────── XBRL -> annual table ───────────────────────────
 ANNUAL_FORMS = ("10-K", "10-K/A", "10-KT")
+QUARTERLY_FORMS = ("10-Q", "10-Q/A")
 TAGS = {
     "revenue": ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet",
                 "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueGoodsNet"],
@@ -186,8 +187,18 @@ def latest_annual_filing(facts: dict) -> str:
                 for r in _rows(usgaap, tag, "USD") if str(r.get("form", "")).startswith(ANNUAL_FORMS)), default="")
 
 
-def eps_by_filing_date(facts: dict) -> pd.Series:
-    """Annual diluted EPS indexed by the date it became public (filing date) -> no look-ahead in P/E bands."""
+def split_factor_after(splits: pd.Series | None, date) -> float:
+    """Product of the split ratios that took effect after `date` (EPS filed before a 10-for-1 split is
+    divided by 10 so it matches split-adjusted prices)."""
+    if splits is None or len(splits) == 0:
+        return 1.0
+    after = splits[splits.index > pd.Timestamp(date)]
+    return float(np.prod(after.values)) if len(after) else 1.0
+
+
+def eps_by_filing_date(facts: dict, splits: pd.Series | None = None) -> pd.Series:
+    """Annual diluted EPS indexed by the date it became public (filing date) -> no look-ahead in P/E bands.
+    EPS is restated for stock splits that happened after its filing (prices are split-adjusted)."""
     usgaap = facts.get("facts", {}).get("us-gaap", {})
     out = {}
     for tag in TAGS["eps_diluted"]:
@@ -197,14 +208,125 @@ def eps_by_filing_date(facts: dict) -> pd.Series:
                 end, filed = pd.Timestamp(u["end"]), pd.Timestamp(u["filed"])
                 # the period's own 10-K (filed within ~120 days of period end), not later comparatives
                 if (filed - end).days <= 120:
-                    out.setdefault(filed, float(u["val"]))
+                    out.setdefault(filed, float(u["val"]) / split_factor_after(splits, filed))
         if out:
             break
     return pd.Series(out, dtype=float).sort_index()
 
 
+def split_adjust_eps(fin: pd.DataFrame, facts: dict, splits: pd.Series | None) -> pd.DataFrame:
+    """The annual table keeps the latest-filed EPS per year, which is pre-split for years no later 10-K
+    restated (e.g. FY2021 $15.00 vs FY2022 $2.65 after a 10-for-1 split). Divide each by the splits
+    after the filing it came from."""
+    if splits is None or len(splits) == 0 or "eps_diluted" not in fin:
+        return fin
+    usgaap = facts.get("facts", {}).get("us-gaap", {})
+    filed = {}
+    for tag in TAGS["eps_diluted"]:
+        for u in _rows(usgaap, tag, "USD/shares"):
+            if str(u.get("form", "")).startswith(ANNUAL_FORMS) and "start" in u:
+                k = u["end"]
+                if k not in filed or u.get("filed", "") > filed[k][0]:
+                    filed[k] = (u.get("filed", ""), float(u["val"]))
+        if filed:
+            break
+    fin = fin.copy()
+    for y in fin.index:
+        hit = filed.get(fin.loc[y, "fy_end"])
+        if hit and np.isclose(hit[1], fin.loc[y, "eps_diluted"]):
+            fin.loc[y, "eps_diluted"] = hit[1] / split_factor_after(splits, hit[0])
+    return fin
+
+
+# ─────────────────────────── trailing twelve months (10-Q) ───────────────────────────
+TTM_FLOWS = ("revenue", "operating_income", "net_income", "operating_cf", "capex", "depreciation",
+             "interest_expense", "dividends")
+TTM_INSTANTS = ("cash", "total_equity", "_ltd_total", "_ltd_noncurrent", "_ltd_current", "_cp", "_stb")
+
+
+def _durations(usgaap: dict, tag: str, unit: str = "USD") -> dict:
+    """{(start, end): value} for every duration fact in 10-K / 10-Q filings, latest filing wins."""
+    best: dict[tuple, tuple[str, float]] = {}
+    for u in _rows(usgaap, tag, unit):
+        if "start" not in u or not str(u.get("form", "")).startswith(ANNUAL_FORMS + QUARTERLY_FORMS):
+            continue
+        k = (pd.Timestamp(u["start"]), pd.Timestamp(u["end"]))
+        if k not in best or u.get("filed", "") > best[k][0]:
+            best[k] = (u.get("filed", ""), float(u["val"]))
+    return {k: v[1] for k, v in best.items()}
+
+
+def _match(d: dict, start, end, tol: int = 10):
+    for (s, e), v in d.items():
+        if abs((s - start).days) <= tol and abs((e - end).days) <= tol:
+            return v
+    return None
+
+
+def ttm(facts: dict, fin: pd.DataFrame) -> dict | None:
+    """Trailing twelve months to the latest 10-Q after the last 10-K:
+        TTM = last fiscal year + year-to-date (this year) - same year-to-date last year,
+    plus the balance sheet at that quarter end. None when no 10-Q follows the last 10-K.
+    `ytd_growth` (this year-to-date vs. last year's) is the most recent revenue growth on record."""
+    usgaap = facts.get("facts", {}).get("us-gaap", {})
+    fy_end = pd.Timestamp(fin["fy_end"].iloc[-1])
+    win = None
+    for tag in TAGS["revenue"]:
+        d = _durations(usgaap, tag)
+        cands = [(s, e) for (s, e) in d if abs((s - fy_end).days - 1) <= 10 and (e - fy_end).days >= 60
+                 and (e - s).days < 340]
+        if cands:
+            s, e = max(cands, key=lambda k: k[1])
+            win = (s, e, s - pd.DateOffset(years=1), e - pd.DateOffset(years=1))
+            break
+    if win is None:
+        return None
+    cs, ce, ps, pe = win
+    out = {"period_end": ce.date().isoformat(), "ytd_start": cs.date().isoformat(),
+           "ytd_months": int(round((ce - cs).days / 30.44))}
+    for key in TTM_FLOWS:
+        out[key] = np.nan
+        for tag in TAGS[key]:
+            d = _durations(usgaap, tag)
+            fy = _match(d, fy_end - pd.DateOffset(years=1) + pd.Timedelta(days=1), fy_end)
+            cur, prev = _match(d, cs, ce), _match(d, ps, pe)
+            if fy is not None and cur is not None and prev is not None:
+                out[key] = fy + cur - prev
+                if key == "revenue":
+                    out["revenue_ytd"], out["revenue_ytd_prior"] = cur, prev
+                break
+    if not np.isfinite(out["revenue"]):
+        return None
+    for key in TTM_INSTANTS:
+        out[key] = np.nan
+        for tag in TAGS[key]:
+            vals = [(u.get("filed", ""), float(u["val"])) for u in _rows(usgaap, tag, "USD")
+                    if "start" not in u and abs((pd.Timestamp(u["end"]) - ce).days) <= 5]
+            if vals:
+                out[key] = max(vals)[1]
+                break
+    ltd = (np.nansum([out["_ltd_noncurrent"], out["_ltd_current"]])
+           if np.isfinite(out["_ltd_noncurrent"]) or np.isfinite(out["_ltd_current"]) else out["_ltd_total"])
+    out["debt"] = float((float(ltd) if np.isfinite(ltd) else np.nan) + np.nansum([out["_cp"], out["_stb"]]))
+    for k in [k for k in out if k.startswith("_")]:
+        del out[k]
+    for k in ("capex", "dividends", "interest_expense"):
+        out[k] = abs(out[k]) if np.isfinite(out[k]) else out[k]
+    out["ytd_growth"] = (out["revenue_ytd"] / out["revenue_ytd_prior"] - 1
+                         if out.get("revenue_ytd_prior") else np.nan)
+    return out
+
+
 # ─────────────────────────── prices (yfinance) ───────────────────────────
-def _yf_prices(ticker: str, years: int = 3) -> pd.DataFrame:
+def _yf_splits(ticker: str) -> pd.Series:
+    import yfinance as yf
+    s = yf.Ticker(ticker).splits
+    if getattr(s.index, "tz", None) is not None:
+        s.index = s.index.tz_localize(None)
+    return s[s > 0]
+
+
+def _yf_prices(ticker: str, years: int = 5) -> pd.DataFrame:
     import yfinance as yf
     raw = yf.download(ticker, period=f"{years}y", auto_adjust=True, progress=False,
                       multi_level_index=False, timeout=20)
@@ -248,9 +370,9 @@ def positioning(ticker: str) -> dict | None:
 
 
 # ─────────────────────────── bundle ───────────────────────────
-def load_bundle(ticker: str, years: int = 3, *, price_fetch: Callable[[str], pd.DataFrame] | None = None,
+def load_bundle(ticker: str, years: int = 5, *, price_fetch: Callable[[str], pd.DataFrame] | None = None,
                 http_get: Callable[[str], dict] | None = None, risk_free: float | None = None,
-                with_positioning: bool = True) -> dict:
+                with_positioning: bool = True, splits_fetch: Callable[[str], pd.Series] | None = None) -> dict:
     """Everything the engine needs for one ticker. Raises UnsupportedFiler / DataUnavailable."""
     ticker = ticker.upper().strip()
     fetch = price_fetch or (lambda t: _yf_prices(t, years))
@@ -277,7 +399,13 @@ def load_bundle(ticker: str, years: int = 3, *, price_fetch: Callable[[str], pd.
         raise UnsupportedFiler("Shares outstanding not found in SEC filings.")
 
     close = prices["close"]
-    eps = eps_by_filing_date(facts)
+    try:
+        splits = (splits_fetch or _yf_splits)(ticker)
+    except Exception:  # noqa: BLE001 - EPS then stays as filed; the P/E band note says so
+        splits = None
+    eps = eps_by_filing_date(facts, splits)
+    fin = split_adjust_eps(fin, facts, splits)
+    t12 = ttm(facts, fin)
     pe = None
     if len(eps):
         eps_asof = eps.reindex(close.index.union(eps.index)).ffill().reindex(close.index)
@@ -288,9 +416,12 @@ def load_bundle(ticker: str, years: int = 3, *, price_fetch: Callable[[str], pd.
         "prices": prices, "index": index, "financials": fin, "shares": shares,
         "last_price": float(close.iloc[-1]), "pe_history": pe,
         "eps_latest": float(eps.iloc[-1]) if len(eps) else None,
+        "ttm": t12, "eps_ttm": (t12["net_income"] / shares) if t12 and np.isfinite(t12["net_income"]) else None,
+        "splits_checked": splits is not None,
         "positioning": positioning(ticker) if with_positioning else None,
         "risk_free_live": risk_free,
-        "sources": ["Yahoo Finance (prices)", f"SEC EDGAR XBRL 10-K (CIK {cik}, latest 10-K filed {last_filed})"],
+        "sources": ["Yahoo Finance (prices, splits)", f"SEC EDGAR XBRL 10-K (CIK {cik}, latest 10-K filed {last_filed})"]
+        + ([f"SEC EDGAR XBRL 10-Q (trailing twelve months to {t12['period_end']})"] if t12 else []),
         "as_of": str(prices.index[-1].date()),
         "fetched_at": datetime.now().isoformat(timespec="seconds"),
     }

@@ -74,8 +74,15 @@ def rule_opinion(ctx: dict) -> dict:
     score, basis = 0.0, []
     up = v["expected_upside"]
     vs = 3 if up > 0.25 else 2 if up > 0.10 else -3 if up < -0.25 else -2 if up < -0.10 else 0
+    if not v.get("scenarios_bracket_price", True):
+        # The scenarios cannot reach the market price: the DCF inputs, not the market, are the likelier
+        # error, so valuation must not single-handedly decide the rating.
+        vs /= 2
+        basis.append(f"valuation {vs:+.1f} (prob-weighted upside {up:+.1%}; half weight: price outside the "
+                     f"bear-bull range)")
+    else:
+        basis.append(f"valuation {vs:+d} (prob-weighted upside {up:+.1%})")
     score += vs
-    basis.append(f"valuation {vs:+d} (prob-weighted upside {up:+.1%})")
     for tf, w in (("Monthly", 1.0), ("Weekly", 1.0), ("Daily", 0.5)):
         al = t[tf]["ma_alignment"]
         sc = (w if al == "bullish stack" else -w if al == "bearish stack" else 0)
@@ -159,6 +166,9 @@ def analyze(bundle: dict, assumptions: DCFAssumptions | None = None, regime_labe
         "liabilities_to_equity": ratio("total_liabilities", "total_equity"),
         "current_ratio": ratio("current_assets", "current_liabilities"),
         "fcf": float(last["fcf"] / 1e6), "fcf_margin": float(last["fcf_margin"]),
+        "ttm": ({"period_end": val["ttm"]["period_end"], "revenue": float(val["ttm"]["revenue"] / 1e6),
+                 "ytd_months": val["ttm"]["ytd_months"],
+                 "ytd_revenue_growth": val["ttm"].get("ytd_growth")} if val.get("ttm") else None),
         "eps_diluted": float(last["eps_diluted"]) if "eps_diluted" in fin and pd.notna(last["eps_diluted"]) else None,
         "pe_on_last_fy_eps": (bundle["last_price"] / bundle["eps_latest"]) if bundle.get("eps_latest") else None,
         "history_revenue": {k: float(x / 1e6) for k, x in fin["revenue"].items()},
@@ -183,6 +193,10 @@ def analyze(bundle: dict, assumptions: DCFAssumptions | None = None, regime_labe
             "scenarios": val["scenarios"], "wacc": a["wacc"], "beta": a["beta_used"],
             "risk_free": a["risk_free_used"], "risk_free_source": a["risk_free_source"], "erp_used": a["erp_used"],
             "terminal_growth": a["terminal_growth"], "growth_high": a["growth_high_used"],
+            "growth_source": a["growth_source"], "fcf_margin_source": a["fcf_margin_source"],
+            "base_period": a["base_period"], "projection_years": a["projection_years"],
+            "stub_years": a["stub_years"], "implied_growth": a["implied_growth"], "implied_wacc": a["implied_wacc"],
+            "scenarios_bracket_price": val["scenarios_bracket_price"],
             "fcf_margin": a["fcf_margin_used"], "tv_share_of_ev": val["base"]["tv_share_of_ev"],
             "sensitivity_min": float(np.nanmin(val["sensitivity"].values)),
             "sensitivity_max": float(np.nanmax(val["sensitivity"].values)),
@@ -255,8 +269,11 @@ def rule_based_text(ctx: dict) -> str:
           f"ROE {(f['roe'] or 0):.1%}, liabilities/equity {(f['liabilities_to_equity'] or 0):.2f}x"
           + (f", current ratio {f['current_ratio']:.2f}x" if f.get("current_ratio") else "")
           + (f", P/E on last fiscal-year EPS {f['pe_on_last_fy_eps']:.1f}x" if f.get("pe_on_last_fy_eps") else "") + ".",
-          f"Free cash flow (CFO − CapEx) was ${f['fcf']:,.0f}M, a {f['fcf_margin']:.1%} margin. Revenue path: "
-          + " → ".join(f"{k} ${x:,.0f}M" for k, x in f["history_revenue"].items()) + ".",
+          f"Free cash flow to the firm (CFO − CapEx + after-tax interest) was ${f['fcf']:,.0f}M, a {f['fcf_margin']:.1%} "
+          "margin. Revenue path: " + " → ".join(f"{k} ${x:,.0f}M" for k, x in f["history_revenue"].items()) + "."
+          + (f" Trailing twelve months to {f['ttm']['period_end']}: revenue ${f['ttm']['revenue']:,.0f}M"
+             + (f"; {f['ttm']['ytd_months']}-month year-to-date revenue {_pct(f['ttm']['ytd_revenue_growth'])} y/y"
+                if f["ttm"].get("ytd_revenue_growth") is not None else "") + " (10-Q)." if f.get("ttm") else ""),
           "Analyst consensus and the earnings calendar are not connected.", "",
           "## 2. Money Flow & Positioning", ""]
     cmf = mf.get("cmf_20")
@@ -295,8 +312,9 @@ def rule_based_text(ctx: dict) -> str:
           f"base {_usd(v['scenarios']['Base']['per_share'])}, bull {_usd(v['scenarios']['Bull']['per_share'])}; "
           f"probability-weighted {_usd(v['expected_per_share'])} ({_pct(v['expected_upside'])}).",
           f"Inputs: risk-free {v['risk_free']:.2%} ({v['risk_free_source']}), beta {v['beta']:.2f}, ERP {v['erp_used']:.2%}, "
-          f"WACC {v['wacc']:.2%}, year-1 growth {v['growth_high']:.1%} fading to {v['terminal_growth']:.1%}, FCF margin "
-          f"{v['fcf_margin']:.1%}. Terminal value is {v['tv_share_of_ev']:.0%} of EV; sensitivity range "
+          f"WACC {v['wacc']:.2%}, base {v['base_period']}, year-1 growth {v['growth_high']:.1%} ({v['growth_source']}) "
+          f"fading to {v['terminal_growth']:.1%} over {v['projection_years']} years, FCFF margin "
+          f"{v['fcf_margin']:.1%} ({v['fcf_margin_source']}). Terminal value is {v['tv_share_of_ev']:.0%} of EV; sensitivity range "
           f"{_usd(v['sensitivity_min'])}–{_usd(v['sensitivity_max'])}.",
           *[f"{m} band (10th/50th/90th pct): {_usd(b['low'])} / {_usd(b['mid'])} / {_usd(b['high'])}."
             for m, b in v["relative_bands"].items()],
@@ -382,6 +400,9 @@ def compact_summary(report: Report) -> dict:
         "dcf_base": v["dcf_base_per_share"],
         "scenarios": {k: {"per_share": s["per_share"], "prob": s["prob"]} for k, s in v["scenarios"].items()},
         "wacc": v["wacc"], "terminal_growth": v["terminal_growth"], "macro_regime": rg,
+        "base_period": v["base_period"], "growth_year1": v["growth_high"], "fcf_margin": v["fcf_margin"],
+        "implied_growth_year1": v["implied_growth"], "implied_wacc": v["implied_wacc"],
+        "scenarios_bracket_price": v["scenarios_bracket_price"],
         "levels": {k: lv[k] for k in ("stop", "target1", "target2")}, "touch_prob_6m": lv["touch_prob_6m"],
         "touch_prob_6m_driftless": lv["touch_prob_6m_driftless"],
         "drift": {k: report.ctx["drift"].get(k) for k in ("source", "market_expected_return", "stock_expected_return")},

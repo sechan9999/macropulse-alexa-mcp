@@ -196,8 +196,17 @@ def build(rep: Report, charts: dict[str, bytes]) -> bytes:
         ["Equity risk premium", f"{a['erp_base']:.2%} base {rg['erp_shift']:+.2%} regime shift = {a['erp_used']:.2%}"],
         ["Beta (Blume-adjusted)", f"{a['beta_used']:.2f}"], ["Pre-tax cost of debt", f"{a['cost_of_debt_used']:.2%}"],
         ["Tax rate", f"{a['tax_rate']:.0%}"], ["WACC", f"{a['wacc']:.2%}"],
-        ["Year-1 growth -> terminal", f"{a['growth_high_used']:.1%} -> {a['terminal_growth']:.1%}"],
-        ["FCF margin", f"{a['fcf_margin_used']:.1%}"],
+        ["Base period", f"{a['base_period']} (revenue ${a['base_revenue'] / 1e6:,.0f}M; discounted from the price "
+                        f"date, stub {a['stub_years']:.2f}y)"],
+        ["Year-1 growth -> terminal", f"{a['growth_high_used']:.1%} -> {a['terminal_growth']:.1%} over "
+                                      f"{a['projection_years']} years"
+                                      + (f", excess growth half-life {a['growth_half_life']:g}y" if a.get("growth_half_life")
+                                         else ", linear fade") + f" ({a['growth_source']})"],
+        ["FCFF margin", f"{a['fcf_margin_used']:.1%} ({a['fcf_margin_source']}; FCFF = CFO - CapEx + interest x (1 - tax))"],
+        ["Net debt", f"${(val['debt'] - val['cash']) / 1e6:,.0f}M (balance sheet {a['balance_sheet_date']})"],
+        ["Reverse DCF (price-implied)",
+         ("year-1 growth " + (f"{a['implied_growth']:.1%}" if a.get("implied_growth") is not None else "n/a")
+          + ", WACC " + (f"{a['implied_wacc']:.2%}" if a.get("implied_wacc") is not None else "n/a"))],
     ])
     D.para("Sources: " + "; ".join(ctx["data_sources"]) + ". News, consensus estimates and the earnings calendar are not connected.",
            size=9)

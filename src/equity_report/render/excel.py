@@ -2,7 +2,8 @@
 
 Colour code: blue = hard-coded input, black = formula, green = link to another sheet,
 yellow fill = key assumption the user is expected to change. Amounts in USD millions,
-per-share values in USD. Changing any yellow cell recalculates DCF, sensitivity, scenarios
+per-share values in USD. The DCF starts from the base period on the Assumptions sheet (trailing
+twelve months to the latest 10-Q when available) and discounts from the price date. Changing any yellow cell recalculates DCF, sensitivity, scenarios
 and the summary. A test recalculates this workbook in LibreOffice and checks it matches the
 Python engine to 1e-6.
 """
@@ -72,6 +73,18 @@ def _num(v):
     return None if v is None or (isinstance(v, float) and not np.isfinite(v)) or pd.isna(v) else float(v)
 
 
+def _growth_fml(g1: str, t: str, n: int, half_life) -> str:
+    """Year-t growth: decay of the excess over terminal growth (Assumptions!B28) with half-life B31,
+    rescaled so year n is exactly terminal growth; linear fade when there is no half-life (same as dcf.growth_path)."""
+    gT = "Assumptions!$B$28"
+    if n <= 1:
+        return f"={g1}"
+    if not half_life:
+        return f"={g1}+({gT}-{g1})*({t}-1)/{n - 1}"
+    phi = "0.5^(1/Assumptions!$B$31)"
+    return f"={gT}+({g1}-{gT})*(({phi})^({t}-1)-({phi})^{n - 1})/(1-({phi})^{n - 1})"
+
+
 def build(rep: Report, chart_png: bytes | None = None) -> bytes:
     b, val, ctx = rep.bundle, rep.val, rep.ctx
     fin: pd.DataFrame = val["history"]
@@ -87,7 +100,9 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
     wf = wb.active
     wf.title = "Financials"
     _title(wf, f"{b['name']} ({b['ticker']}) — annual financials (USD millions)", f"Source: {src}")
-    _hdr(wf, 4, ["Item (USD m)"] + [f"FY{y}" for y in years])
+    t12 = val.get("ttm")
+    ttm_col = L(2 + ny) if t12 else None
+    _hdr(wf, 4, ["Item (USD m)"] + [f"FY{y}" for y in years] + ([f"TTM {t12['period_end']}"] if t12 else []))
     wf.cell(row=5, column=1, value="Fiscal year end").font = _f()
     for j, y in enumerate(years):
         c = wf.cell(row=5, column=2 + j, value=str(fin.loc[y, "fy_end"]) if "fy_end" in fin else y)
@@ -103,16 +118,26 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
                 v /= M
             c = wf.cell(row=r, column=2 + j, value=v)
             c.font, c.number_format = _f(BLUE), ('$0.00' if k == "eps_diluted" else F_M)
+        if t12 and k in t12 and k != "eps_diluted":
+            v = _num(t12[k])
+            c = wf.cell(row=r, column=2 + ny, value=v / M if v is not None else None)
+            c.font, c.number_format = _f(BLUE), F_M
+    if t12:
+        c = wf.cell(row=5, column=2 + ny, value=f"10-Q {t12['period_end']}")
+        c.font, c.alignment = _f(BLUE), Alignment(horizontal="right")
     r0 = 6 + len(FIN_ROWS) + 1
-    _hdr(wf, r0, ["Ratios & derived"] + [f"FY{y}" for y in years])
+    _hdr(wf, r0, ["Ratios & derived"] + [f"FY{y}" for y in years] + ([f"TTM {t12['period_end']}"] if t12 else []))
     ratios = [
         ("Revenue growth", lambda c, p: f'=IFERROR({c}{R["revenue"]}/{p}{R["revenue"]}-1,"")' if p else None, F_PCT),
         ("Operating margin", lambda c, p: f'=IFERROR({c}{R["operating_income"]}/{c}{R["revenue"]},"")', F_PCT),
         ("Net margin", lambda c, p: f'=IFERROR({c}{R["net_income"]}/{c}{R["revenue"]},"")', F_PCT),
         ("ROE", lambda c, p: f'=IFERROR({c}{R["net_income"]}/{c}{R["total_equity"]},"")', F_PCT),
         ("Liabilities / equity", lambda c, p: f'=IFERROR({c}{R["total_liabilities"]}/{c}{R["total_equity"]},"")', F_X),
-        ("Free cash flow (CFO - CapEx)", lambda c, p: f'={c}{R["operating_cf"]}-{c}{R["capex"]}', F_M),
-        ("FCF margin", lambda c, p: f'=IFERROR(({c}{R["operating_cf"]}-{c}{R["capex"]})/{c}{R["revenue"]},"")', F_PCT),
+        ("FCFF (CFO - CapEx + interest x (1 - tax))",
+         lambda c, p: f'={c}{R["operating_cf"]}-{c}{R["capex"]}+ABS({c}{R["interest_expense"]})*(1-Assumptions!$B$19)',
+         F_M),
+        ("FCF margin", lambda c, p: f'=IFERROR(({c}{R["operating_cf"]}-{c}{R["capex"]}+ABS({c}{R["interest_expense"]})'
+                                    f'*(1-Assumptions!$B$19))/{c}{R["revenue"]},"")', F_PCT),
         ("EBITDA (EBIT + D&A)", lambda c, p: f'={c}{R["operating_income"]}+{c}{R["depreciation"]}', F_M),
         ("Net debt", lambda c, p: f'={c}{R["debt"]}-{c}{R["cash"]}', F_M),
     ]
@@ -121,13 +146,20 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
         r = r0 + 1 + i
         RR[label] = r
         wf.cell(row=r, column=1, value=label).font = _f()
-        for j in range(ny):
-            fml = fn(L(2 + j), L(1 + j) if j else None)
-            if fml:
+        for j in range(ny + (1 if t12 else 0)):
+            is_ttm = j == ny
+            if is_ttm and label == "Liabilities / equity":          # total liabilities not taken from the 10-Q
+                continue
+            fml = fn(L(2 + j), L(1 + j) if j and not is_ttm else None)
+            if is_ttm and label == "Revenue growth" and t12.get("ytd_growth") is not None:
+                fml = _num(t12["ytd_growth"])     # year-to-date vs same period last year (10-Q), not TTM vs FY
+            if fml is not None:
                 c = wf.cell(row=r, column=2 + j, value=fml)
-                c.font, c.number_format = _f(), fmt
-    wf.column_dimensions["A"].width = 30
-    for j in range(ny):
+                c.font, c.number_format = _f(BLUE if isinstance(fml, float) else BLACK), fmt
+                if is_ttm and label == "Revenue growth":
+                    c.comment = Comment("Year-to-date revenue vs. the same period last year (10-Q)", "MacroPulse")
+    wf.column_dimensions["A"].width = 38
+    for j in range(ny + (1 if t12 else 0)):
         wf.column_dimensions[L(2 + j)].width = 13
     wf.freeze_panes = "B6"
 
@@ -135,12 +167,16 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
     wa = wb.create_sheet("Assumptions")
     _title(wa, "Assumptions — edit the yellow cells", "Blue = input · Green = link · Black = formula")
     _hdr(wa, 4, ["Item", "Value", "Basis / note"])
-    rev_r, fcf_r = R["revenue"], RR["FCF margin"]
-    first3 = L(max(2, 2 + ny - 3))
     be = A["beta_est"]
-    g_cell = (f"=MIN(MAX((Financials!{last_col}{rev_r}/Financials!B{rev_r})^(1/{max(ny - 1, 1)})-1,-0.05),0.2)"
-              if A.get("growth_high") is None else A["growth_high"])
-    m_cell = (f"=AVERAGE(Financials!{first3}{fcf_r}:{last_col}{fcf_r})" if A.get("fcf_margin") is None else A["fcf_margin"])
+    beta_note = (f"mean of {be['n_weeks']}w weekly (raw {be['raw_weekly']:.2f}) and {be['n_months']}m monthly "
+                 f"(raw {be['raw_monthly']:.2f}) regressions vs S&P 500, Blume-adjusted"
+                 if be.get("raw_monthly") is not None else
+                 f"{be['n_weeks']}w weekly regression vs S&P 500, raw {be['raw']:.2f}, Blume-adjusted")
+    inp = val["inputs"]
+    HL = inp.get("half_life")
+
+    def _opt(x):
+        return _num(x) if x is not None else "n/a"
     rows = [
         (5, "Company", b["name"], None, BLUE, False, f"CIK {b.get('cik') or '-'}"),
         (6, "Ticker", b["ticker"], None, BLUE, False, ""),
@@ -152,24 +188,34 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
         (13, "Equity risk premium (base)", A["erp_base"], F_PCT, BLUE, True, "US implied ERP typically 4-6%"),
         (14, "Regime ERP shift", rg["erp_shift"], F_PCT, BLUE, True, f"MacroPulse regime: {rg['regime']}"),
         (15, "Equity risk premium used", "=B13+B14", F_PCT, BLACK, False, ""),
-        (16, "Beta", A["beta_used"], "0.00", BLUE, True,
-         f"{be['n_weeks']}w weekly regression vs S&P 500, raw {be['raw']:.2f}, Blume-adjusted"),
+        (16, "Beta", A["beta_used"], "0.00", BLUE, True, beta_note),
         (17, "Cost of equity", "=B12+B16*B15", F_PCT, BLACK, False, "CAPM"),
         (18, "Pre-tax cost of debt", A["cost_of_debt_used"], F_PCT, BLUE, True, "interest expense / debt, clipped 3-10%"),
         (19, "Tax rate", A["tax_rate"], F_PCT, BLUE, True, "21% federal + ~4% state"),
         (20, "After-tax cost of debt", "=B18*(1-B19)", F_PCT, BLACK, False, ""),
-        (21, "Total debt ($m)", f"=Financials!{last_col}{R['debt']}", F_M, GREEN, False, "latest 10-K"),
-        (22, "Cash ($m)", f"=Financials!{last_col}{R['cash']}", F_M, GREEN, False, ""),
+        (21, "Total debt ($m)", val["debt"] / M, F_M, BLUE, False, f"balance sheet {A['balance_sheet_date']}"),
+        (22, "Cash ($m)", val["cash"] / M, F_M, BLUE, False, f"balance sheet {A['balance_sheet_date']}"),
         (23, "Net debt ($m)", "=B21-B22", F_M, BLACK, False, ""),
         (24, "Equity weight", "=IFERROR(B10/(B10+B21),1)", F_PCT, BLACK, False, "market values"),
         (25, "WACC", "=B24*B17+(1-B24)*B20", F_PCT, BLACK, False, ""),
-        (27, "Year-1 revenue growth", g_cell, F_PCT, GREEN if A.get("growth_high") is None else BLUE, True,
-         "default: historical revenue CAGR clipped to -5%..20%"),
+        (27, "Year-1 revenue growth", A["growth_high_used"], F_PCT, BLUE, True,
+         f"{A['growth_source']}; default clipped to -10%..50%"),
         (28, "Terminal growth", A["terminal_growth"], F_PCT, BLUE, True, "keep at or below long-run nominal GDP"),
-        (29, "FCF margin", m_cell, F_PCT, GREEN if A.get("fcf_margin") is None else BLUE, True,
-         "default: 3-year average (CFO - CapEx) / revenue"),
+        (29, "FCFF margin", A["fcf_margin_used"], F_PCT, BLUE, True,
+         f"{A['fcf_margin_source']}; FCFF = CFO - CapEx + interest x (1 - tax)"),
         (30, "Projection years", N, "0", BLUE, False, "sheet layout is generated for this value"),
+        (31, "Growth half-life (years)", HL if HL else "linear", "0.0", BLUE, True,
+         "excess growth over terminal halves every this many years; year N lands on terminal growth"),
         (32, "Macro regime", rg["regime"], None, BLUE, False, rg["source"]),
+        (34, "Base period", A["base_period"], None, BLUE, False, f"period end {A['base_period_end']}"),
+        (35, "Base revenue ($m)", inp["revenue0"] / M, F_M, BLUE, True,
+         "trailing twelve months (10-K + 10-Q year-to-date - prior-year year-to-date)" if t12 else "last fiscal year"),
+        (36, "Stub (years)", inp["stub"], "0.000", BLUE, False,
+         "years from the base period end to the price date; discount exponent = t - stub"),
+        (37, "Market-implied year-1 growth", _opt(A["implied_growth"]), F_PCT, BLUE, False,
+         "reverse DCF: growth at which the base value equals the price (other inputs held; computed, not live)"),
+        (38, "Market-implied WACC", _opt(A["implied_wacc"]), F_PCT, BLUE, False,
+         "reverse DCF: WACC at which the base value equals the price (computed, not live)"),
     ]
     for r, label, v, fmt, color, key, note in rows:
         wa.cell(row=r, column=1, value=label).font = _f()
@@ -181,23 +227,26 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
 
     # ── DCF ──
     wd = wb.create_sheet("DCF")
-    _title(wd, "DCF — FCFF proxy (CFO - CapEx), end-of-year discounting", "USD millions · growth fades linearly to terminal g")
+    _title(wd, "DCF — FCFF (CFO - CapEx + after-tax interest), discounted from the price date",
+           f"USD millions · base {A['base_period']} · growth decays to terminal g by year {N} "
+           + (f"(half-life {HL:g}y)" if HL else "(linear)"))
     cols = [L(3 + i) for i in range(N)]
     lc = cols[-1]
-    _hdr(wd, 4, ["Item", f"FY{years[-1]} (actual)"] + [f"FY{int(years[-1]) + i + 1}E" for i in range(N)])
-    for r, t in {5: "Year t", 6: "Revenue growth", 7: "Revenue", 8: "Free cash flow", 9: "Discount factor",
-                 10: "PV of FCF"}.items():
+    _hdr(wd, 4, ["Item", f"Base: {A['base_period']}"] + [f"Year {i + 1}" for i in range(N)])
+    for r, t in {5: "Year t", 6: "Revenue growth", 7: "Revenue", 8: "Free cash flow (FCFF)", 9: "Discount factor",
+                 10: "PV of FCF", 11: "Discount period (t - stub)"}.items():
         wd.cell(row=r, column=1, value=t).font = _f()
     _put(wd, "B5", 0, "0")
-    _put(wd, "B7", f"=Financials!{last_col}{rev_r}", F_M, GREEN)
+    _put(wd, "B7", "=Assumptions!B35", F_M, GREEN)
     for i, c in enumerate(cols):
         p = L(2 + i)
         _put(wd, f"{c}5", i + 1, "0", BLUE)
-        _put(wd, f"{c}6", f"=Assumptions!$B$27+(Assumptions!$B$28-Assumptions!$B$27)*({c}5-1)/{max(N - 1, 1)}", F_PCT)
+        _put(wd, f"{c}6", _growth_fml("Assumptions!$B$27", f"{c}5", N, HL), F_PCT)
         _put(wd, f"{c}7", f"={p}7*(1+{c}6)", F_M)
         _put(wd, f"{c}8", f"={c}7*Assumptions!$B$29", F_M)
-        _put(wd, f"{c}9", f"=1/(1+Assumptions!$B$25)^{c}5", "0.0000")
+        _put(wd, f"{c}9", f"=1/(1+Assumptions!$B$25)^{c}11", "0.0000")
         _put(wd, f"{c}10", f"={c}8*{c}9", F_M)
+        _put(wd, f"{c}11", f"={c}5-Assumptions!$B$36", "0.000")
     out = [(12, "Sum of PV (FCF)", f"=SUM({cols[0]}10:{lc}10)", F_M),
            (13, "Terminal value (Gordon)", f"={lc}8*(1+Assumptions!B28)/(Assumptions!B25-Assumptions!B28)", F_M),
            (14, "PV of terminal value", f"=B13*{lc}9", F_M),
@@ -208,7 +257,8 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
            (19, "Share price ($)", "=Assumptions!B8", F_PS),
            (20, "Upside / (downside)", "=B18/B19-1", F_PCT),
            (21, "Terminal value % of EV", "=B14/B15", F_PCT),
-           (22, "Implied EV / EBITDA", f'=IFERROR(B15/Financials!{last_col}{RR["EBITDA (EBIT + D&A)"]},"")', F_X)]
+           (22, "Implied EV / EBITDA" + (" (TTM)" if t12 else ""),
+            f'=IFERROR(B15/Financials!{ttm_col or last_col}{RR["EBITDA (EBIT + D&A)"]},"")', F_X)]
     for r, label, fml, fmt in out:
         wd.cell(row=r, column=1, value=label).font = _f(bold=r in (18, 20))
         _put(wd, f"B{r}", fml, fmt, GREEN if fml.startswith(("=Assumptions", "=Financials")) else BLACK, bold=r in (18, 20))
@@ -225,7 +275,7 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
     for j, s in enumerate(steps):
         c = ws.cell(row=4, column=2 + j, value=f"=Assumptions!$B$28+({s})")
         c.font, c.number_format, c.fill = _f(WHITE, True), F_PCT, HDR
-    rf_, rt_ = f"DCF!${cols[0]}$8:${lc}$8", f"DCF!${cols[0]}$5:${lc}$5"
+    rf_, rt_ = f"DCF!${cols[0]}$8:${lc}$8", f"DCF!${cols[0]}$11:${lc}$11"
     for i, s in enumerate(steps):
         r = 5 + i
         c = ws.cell(row=r, column=1, value=f"=Assumptions!$B$25+({s})")
@@ -233,7 +283,7 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
         for j in range(len(steps)):
             g = f"{L(2 + j)}$4"
             cell = ws.cell(row=r, column=2 + j, value=(
-                f'=IFERROR((SUMPRODUCT({rf_}/(1+$A{r})^{rt_})+DCF!${lc}$8*(1+{g})/($A{r}-{g})/(1+$A{r})^DCF!${lc}$5'
+                f'=IFERROR((SUMPRODUCT({rf_}/(1+$A{r})^{rt_})+DCF!${lc}$8*(1+{g})/($A{r}-{g})/(1+$A{r})^DCF!${lc}$11'
                 f'-Assumptions!$B$23)*1E6/Assumptions!$B$9,"")'))
             cell.font, cell.number_format = _f(), F_PS
             if i == 2 and j == 2:
@@ -257,7 +307,7 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
                           f"+(1-Assumptions!$B$24)*(Assumptions!$B$18+B{r}+D{r})*(1-Assumptions!$B$19)", F_PCT)
         _put(ws, f"G{r}", f"=Assumptions!$B$28+E{r}", F_PCT)
         _put(ws, f"H{r}", (f'=IFERROR((SUMPRODUCT({rf_}/(1+F{r})^{rt_})+DCF!${lc}$8*(1+G{r})/(F{r}-G{r})'
-                           f'/(1+F{r})^DCF!${lc}$5-Assumptions!$B$23)*1E6/Assumptions!$B$9,"")'), F_PS, bold=True)
+                           f'/(1+F{r})^DCF!${lc}$11-Assumptions!$B$23)*1E6/Assumptions!$B$9,"")'), F_PS, bold=True)
         _put(ws, f"I{r}", f'=IFERROR(H{r}/Assumptions!$B$8-1,"")', F_PCT)
         _put(ws, f"J{r}", x["tab13_price_shock"], F_PCT, BLUE)
     ws.cell(row=24, column=1, value=FOMC_NOTE).font = _f("595959", size=9)
@@ -289,13 +339,13 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
         for k in range(N):
             c, p = L(3 + k), L(2 + k)
             _put(wsc, f"{c}{b0}", k + 1, "0")
-            _put(wsc, f"{c}{b0 + 1}", f"=$F${r}+(Assumptions!$B$28-$F${r})*({c}{b0}-1)/{max(N - 1, 1)}", F_PCT)
+            _put(wsc, f"{c}{b0 + 1}", _growth_fml(f"$F${r}", f"{c}{b0}", N, HL), F_PCT)
             _put(wsc, f"{c}{b0 + 2}", f"={p}{b0 + 2}*(1+{c}{b0 + 1})", F_M)
             _put(wsc, f"{c}{b0 + 3}", f"={c}{b0 + 2}*$G${r}", F_M)
-            _put(wsc, f"{c}{b0 + 4}", f"={c}{b0 + 3}/(1+$H${r})^{c}{b0}", F_M)
+            _put(wsc, f"{c}{b0 + 4}", f"={c}{b0 + 3}/(1+$H${r})^({c}{b0}-Assumptions!$B$36)", F_M)
         lk = L(2 + N)
         ev = (f"SUM(C{b0 + 4}:{lk}{b0 + 4})+{lk}{b0 + 3}*(1+Assumptions!$B$28)/($H${r}-Assumptions!$B$28)"
-              f"/(1+$H${r})^{lk}{b0}")
+              f"/(1+$H${r})^({lk}{b0}-Assumptions!$B$36)")
         _put(wsc, f"I{r}", f"=({ev}-Assumptions!$B$23)*1E6/Assumptions!$B$9", F_PS, bold=True)
         _put(wsc, f"J{r}", f"=I{r}/Assumptions!$B$8-1", F_PCT)
     wsc.cell(row=8, column=1, value="Probability-weighted").font = _f(bold=True)
@@ -388,7 +438,8 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
     _hdr(wsu, 4, ["Item", "Value", "Note"])
     rb, v = ctx["rule_based"], ctx["valuation"]
     summ = [("Share price ($)", "=Assumptions!B8", F_PS, GREEN, b["as_of"]),
-            ("DCF value / share, base ($)", "=DCF!B18", F_PS, GREEN, "FCFF proxy, 5y + Gordon terminal"),
+            ("DCF value / share, base ($)", "=DCF!B18", F_PS, GREEN,
+             f"FCFF, base {A['base_period']}, {N}-year fade + Gordon terminal"),
             ("Upside, base", "=DCF!B20", F_PCT, GREEN, ""),
             ("Probability-weighted value ($)", "=Scenarios!I8", F_PS, GREEN, "bear/base/bull weighted by regime"),
             ("Upside, probability-weighted", "=Scenarios!J8", F_PCT, GREEN, ""),
@@ -396,13 +447,17 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
             ("Terminal growth", "=Assumptions!B28", F_PCT, GREEN, ""),
             ("Sensitivity range ($)", '=TEXT(MIN(Sensitivity!B5:F9),"$#,##0.00")&" - "&TEXT(MAX(Sensitivity!B5:F9),"$#,##0.00")',
              None, GREEN, "WACC ±1pp x g ±1pp"),
+            ("Market-implied year-1 growth", "=Assumptions!B37", F_PCT, GREEN,
+             f"reverse DCF; model uses {A['growth_high_used']:.1%}"),
+            ("Market-implied WACC", "=Assumptions!B38", F_PCT, GREEN, f"reverse DCF; model uses {A['wacc']:.2%}"),
             ("Macro regime", rg["regime"], None, BLUE,
              f"weights bear/base/bull {rg['probs']['Bear']:.0%}/{rg['probs']['Base']:.0%}/{rg['probs']['Bull']:.0%}, "
              f"ERP shift {rg['erp_shift']:+.2%}"),
             ("52-week range ($)", f"{v['range_52w']['low']:,.2f} - {v['range_52w']['high']:,.2f}", None, BLUE, "")]
     for mname, bd in v["relative_bands"].items():
         summ.append((f"{mname} band value 10/50/90 ($)", f"{bd['low']:,.2f} / {bd['mid']:,.2f} / {bd['high']:,.2f}",
-                     None, BLUE, "historical multiple percentiles x current fundamentals"))
+                     None, BLUE, "historical multiple percentiles x " + (f"{bd['eps_basis']} EPS" if "eps_basis" in bd
+                                                                          else "current fundamentals")))
     for tf in ("Monthly", "Weekly", "Daily"):
         s = ctx["technical"][tf]
         summ.append((f"{tf} trend", f"{s['ma_alignment']}, MACD {s['macd']['state']}", None, BLUE, ""))

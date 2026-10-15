@@ -459,20 +459,26 @@ $$\text{score}_t = \text{clip}\Bigl(\textstyle\sum_k w_k \cdot \mathbf{1}[\text{
 
 ### Mathematical formulation
 
-**Free cash flow (FCFF proxy) and projection**
-$$\text{FCF}_t = \text{Revenue}_t \times m, \qquad g_t = g_1 + (g_\infty - g_1)\frac{t-1}{N-1}$$
+**Free cash flow to the firm and projection** (base = trailing twelve months to the latest 10-Q)
+$$\text{FCFF} = \text{CFO} - \text{CapEx} + \text{interest}\,(1-\tau), \qquad \text{FCF}_t = \text{Revenue}_t \times m$$
+$$\text{TTM} = \text{FY} + \text{YTD}_{\text{this year}} - \text{YTD}_{\text{last year}}, \qquad g_1 = \frac{\text{YTD revenue}}{\text{prior-year YTD revenue}} - 1 \ \ (\text{clipped to } [-10\%, 50\%])$$
+$$g_t = g_\infty + (g_1 - g_\infty)\,\frac{\varphi^{t-1} - \varphi^{N-1}}{1 - \varphi^{N-1}}, \qquad \varphi = 0.5^{1/h}$$
+The excess growth over $g_\infty$ halves every $h$ years (default 2; revenue growth mean-reverts fast) and lands on $g_\infty$ in year $N$ (default 10).
 
 **Discount rate (CAPM + after-tax debt)**
 $$k_e = r_f + \beta\,(\text{ERP} + \Delta_{\text{regime}}), \qquad \text{WACC} = \tfrac{E}{D+E}k_e + \tfrac{D}{D+E}k_d(1-\tau)$$
 
 **Enterprise and equity value**
-$$\text{EV} = \sum_{t=1}^{N}\frac{\text{FCF}_t}{(1+\text{WACC})^t} + \frac{\text{FCF}_N(1+g_\infty)}{(\text{WACC}-g_\infty)(1+\text{WACC})^N}, \qquad V/\text{share} = \frac{\text{EV} - \text{net debt}}{\text{shares}}$$
+$$\text{EV} = \sum_{t=1}^{N}\frac{\text{FCF}_t}{(1+\text{WACC})^{t-s}} + \frac{\text{FCF}_N(1+g_\infty)}{(\text{WACC}-g_\infty)(1+\text{WACC})^{N-s}}, \qquad V/\text{share} = \frac{\text{EV} - \text{net debt}}{\text{shares}}$$
+$s$ = years from the base period end to the price date; net debt from the same quarter-end balance sheet.
+
+**Reverse DCF** — the year-1 growth $g_1^*$ (or WACC$^*$) at which $V/\text{share}$ equals the price, other inputs held. Bear/bull shift $g_1$ by $\pm\max(5\text{pp}, 0.3\,g_1)$; when the price lies outside the bear–bull range the rating gives valuation half weight.
 
 **Regime-weighted expected value**
 $$\mathbb{E}[V] = \sum_{s\in\{\text{bear},\text{base},\text{bull}\}} p_s(\text{regime})\, V_s$$
 Risk-On 20/50/30 (ERP −0.25pp) · Neutral 25/50/25 · Risk-Off 40/45/15 (ERP +0.50pp).
 
-**Blume-adjusted beta** (2y weekly returns vs S&P 500): $\beta_{adj} = 0.67\,\beta_{raw} + 0.33$
+**Blume-adjusted beta** (mean of the 2y weekly and 5y monthly regressions vs S&P 500): $\beta_{adj} = 0.67\,\beta_{raw} + 0.33$
 
 **Touch-probability drift** (tab-4 Ridge S&P 500 view → CAPM)
 $$\mathbb{E}[R_s] = r_f + \beta\,(\mathbb{E}[R_m]^{\text{Ridge}} - r_f), \qquad \nu = \ln(1+\mathbb{E}[R_s]) - \tfrac{\sigma^2}{2}$$
@@ -487,7 +493,10 @@ Hawkish +50/+25/+25bp · Dovish −50/−25/−10bp · Stagflation +25/+75/+120b
 
 ### Hedge-fund terminology
 
-* **FCFF proxy** — cash from operations minus capital expenditures from SEC 10-K XBRL filings; simpler than EBIT(1−t)+D&A−CapEx−ΔNWC and fully traceable to the filing.
+* **FCFF** — cash from operations minus capital expenditures plus after-tax interest (CFO is after interest, and the model discounts at WACC before subtracting net debt), from SEC 10-K and 10-Q XBRL filings; traceable to the filing.
+* **Trailing twelve months (TTM)** — last fiscal year plus this year's 10-Q year-to-date minus the same period last year; keeps the base current between annual reports.
+* **Reverse DCF** — instead of asking what the stock is worth, asks what growth (or discount rate) the current price already assumes.
+* **Split-adjusted EPS** — EPS filed before a stock split is divided by the split ratio so the P/E history matches split-adjusted prices.
 * **Terminal value share** — when the Gordon terminal value is >80% of EV, the valuation is mostly a bet on WACC and $g_\infty$.
 * **Football field** — side-by-side valuation ranges from different methods; agreement between methods matters more than any single point.
 * **Chaikin Money Flow / OBV** — price-volume proxies for accumulation. The US has no daily institutional net-buy tape like Korea's KRX, so ownership (13F) and short interest are shown as periodic snapshots.
