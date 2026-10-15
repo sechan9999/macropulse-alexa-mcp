@@ -64,12 +64,13 @@ The fan chart draws; VaR 95/99 and Expected Shortfall (CVaR) appear.
 ## Scene 5 — Equity report (1:30–2:05)
 
 **On screen:**
-1. Open `hf-macro-dashboard.streamlit.app/?ticker=AAPL` — it lands directly on the Equity Report tab.
-2. Scroll the regime-weighted scenarios and the WACC × g grid with the FOMC shock badges.
-3. Download the Excel model; change one yellow assumption cell; show the valuation recalculating.
+1. Open `hf-macro-dashboard.streamlit.app/?ticker=AVGO` — it lands directly on the Equity Report tab.
+2. Hold on the caption under the KPIs: "Base TTM to 2026-08-02 … reverse DCF: the price implies 63% year-1 growth".
+3. Scroll the regime-weighted scenarios (bear and bull bracket the price) and the WACC × g grid with the FOMC shock badges.
+4. Download the Excel model; on the Assumptions sheet change B27 (year-1 growth); show the value per share recalculating.
 
 **Narration:**
-> Type any ticker and you get an institutional research pack — fair value from a DCF on SEC ten-K filings, bear, base and bull scenarios weighted by the live macro regime. The Excel model keeps live formulas: change an assumption, and the whole valuation recalculates.
+> Type any ticker for an institutional research pack — a DCF on the latest SEC ten-K and ten-Q filings, scenarios weighted by the live regime, and a reverse DCF showing what growth the price already assumes. Change any assumption in Excel, and the whole valuation recalculates.
 
 ---
 
@@ -86,12 +87,12 @@ then D-pad through the regime card, rates, the NVDA danger index and the watchli
 ## Scene 7 — Trust and close (2:30–2:50)
 
 **On screen:**
-1. A terminal showing the offline test suite passing.
+1. A terminal showing `219 passed` from the offline test suite (or the green Tests badge on GitHub).
 2. The honest-error card shown when live data is unavailable ("says so instead of guessing").
 3. End card: the GitHub repository URL and "Informational only — not investment advice."
 
 **Narration:**
-> Under the hood, a full offline test suite — and one hard rule: if live data isn't available, MacroPulse says so instead of guessing. MacroPulse: an institutional macro desk, one question away.
+> Under the hood, two hundred nineteen offline tests — and one hard rule: if live data isn't available, MacroPulse says so instead of guessing. MacroPulse: an institutional macro desk, one question away.
 
 ---
 
@@ -105,11 +106,11 @@ On a screen device, the same answer renders as a card — the danger index with 
 
 The same engine drives the fourteen-tab dashboard. Ten thousand Monte Carlo paths on SPY — the fan chart draws live, and Value-at-Risk and Expected Shortfall read straight off the simulated distribution, Gaussian or bootstrapped from real market history.
 
-Type any ticker and you get an institutional research pack — fair value from a DCF on SEC ten-K filings, bear, base and bull scenarios weighted by the live macro regime. The Excel model keeps live formulas: change an assumption, and the whole valuation recalculates.
+Type any ticker for an institutional research pack — a DCF on the latest SEC ten-K and ten-Q filings, scenarios weighted by the live regime, and a reverse DCF showing what growth the price already assumes. Change any assumption in Excel, and the whole valuation recalculates.
 
 And it's a real product — the Fire TV companion app is live on the Amazon Appstore. Same AWS endpoint: regime, rates, the danger index, today's signals — all navigable with the remote.
 
-Under the hood, a full offline test suite — and one hard rule: if live data isn't available, MacroPulse says so instead of guessing. MacroPulse: an institutional macro desk, one question away.
+Under the hood, two hundred nineteen offline tests — and one hard rule: if live data isn't available, MacroPulse says so instead of guessing. MacroPulse: an institutional macro desk, one question away.
 
 ---
 
@@ -121,7 +122,7 @@ Under the hood, a full offline test suite — and one hard rule: if live data is
 2. **Fire TV capture.** Install from the Amazon Appstore on the device, or sideload the APK
    (`adb connect <ip>`, `adb install MacroPulse.apk`). Record with an HDMI capture card, or
    `adb shell screenrecord /sdcard/demo.mp4` then `adb pull`.
-3. **Dashboard capture.** Use a clean browser window; `?ticker=AAPL` opens straight on the Equity Report.
+3. **Dashboard capture.** Use a clean browser window; `?ticker=AVGO` opens straight on the Equity Report. Reboot the Streamlit app first if code was merged that day, so the report is on the current engine.
 4. **Echo capture.** Phone on a tripod for the device shot; keep room noise down so the spoken
    answer is the star of Scene 1.
 5. **Length.** Keep the final cut at or under 2:45; judges may stop at 3:00.
