@@ -219,6 +219,11 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
          "reverse DCF: growth at which the base value equals the price (other inputs held; computed, not live)"),
         (38, "Market-implied WACC", _opt(A["implied_wacc"]), F_PCT, BLUE, False,
          "reverse DCF: WACC at which the base value equals the price (computed, not live)"),
+        (39, "Dilution factor (diluted / basic)", A["dilution_factor"], "0.0000", BLUE, True,
+         (f"weighted-average diluted / basic shares, {A['dilution_period']} (RSUs, options)"
+          if A.get("dilution_period") else "no diluted share count in the filings: 1.0")),
+        (40, "Diluted shares", "=B9*B39", "#,##0", BLACK, False,
+         "used for every per-share value; market cap and WACC weights use basic shares (B9)"),
     ]
     for r, label, v, fmt, color, key, note in rows:
         wa.cell(row=r, column=1, value=label).font = _f()
@@ -256,7 +261,7 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
            (15, "Enterprise value", "=B12+B14", F_M),
            (16, "(-) Net debt", "=Assumptions!B23", F_M),
            (17, "Equity value", "=B15-B16", F_M),
-           (18, "Intrinsic value per share ($)", "=B17*1E6/Assumptions!B9", F_PS),
+           (18, "Intrinsic value per share ($)", "=B17*1E6/Assumptions!B40", F_PS),
            (19, "Share price ($)", "=Assumptions!B8", F_PS),
            (20, "Upside / (downside)", "=B18/B19-1", F_PCT),
            (21, "Terminal value % of EV", "=B14/B15", F_PCT),
@@ -287,7 +292,7 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
             g = f"{L(2 + j)}$4"
             cell = ws.cell(row=r, column=2 + j, value=(
                 f'=IFERROR((SUMPRODUCT({rf_}/(1+$A{r})^{rt_})+DCF!${lc}$8*(1+{g})/($A{r}-{g})/(1+$A{r})^DCF!${lc}$11'
-                f'-Assumptions!$B$23)*1E6/Assumptions!$B$9,"")'))
+                f'-Assumptions!$B$23)*1E6/Assumptions!$B$40,"")'))
             cell.font, cell.number_format = _f(), F_PS
             if i == 2 and j == 2:
                 cell.fill = KEY
@@ -310,7 +315,7 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
                           f"+(1-Assumptions!$B$24)*(Assumptions!$B$18+B{r}+D{r})*(1-Assumptions!$B$19)", F_PCT)
         _put(ws, f"G{r}", f"=Assumptions!$B$28+E{r}", F_PCT)
         _put(ws, f"H{r}", (f'=IFERROR((SUMPRODUCT({rf_}/(1+F{r})^{rt_})+DCF!${lc}$8*(1+G{r})/(F{r}-G{r})'
-                           f'/(1+F{r})^DCF!${lc}$11-Assumptions!$B$23)*1E6/Assumptions!$B$9,"")'), F_PS, bold=True)
+                           f'/(1+F{r})^DCF!${lc}$11-Assumptions!$B$23)*1E6/Assumptions!$B$40,"")'), F_PS, bold=True)
         _put(ws, f"I{r}", f'=IFERROR(H{r}/Assumptions!$B$8-1,"")', F_PCT)
         _put(ws, f"J{r}", x["tab13_price_shock"], F_PCT, BLUE)
     ws.cell(row=24, column=1, value=FOMC_NOTE).font = _f("595959", size=9)
@@ -349,7 +354,7 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
         lk = L(2 + N)
         ev = (f"SUM(C{b0 + 4}:{lk}{b0 + 4})+{lk}{b0 + 3}*(1+Assumptions!$B$28)/($H${r}-Assumptions!$B$28)"
               f"/(1+$H${r})^({lk}{b0}-Assumptions!$B$36)")
-        _put(wsc, f"I{r}", f"=({ev}-Assumptions!$B$23)*1E6/Assumptions!$B$9", F_PS, bold=True)
+        _put(wsc, f"I{r}", f"=({ev}-Assumptions!$B$23)*1E6/Assumptions!$B$40", F_PS, bold=True)
         _put(wsc, f"J{r}", f"=I{r}/Assumptions!$B$8-1", F_PCT)
     wsc.cell(row=8, column=1, value="Probability-weighted").font = _f(bold=True)
     _put(wsc, "E8", "=SUM(E5:E7)", F_PCT, note="must be 100%")

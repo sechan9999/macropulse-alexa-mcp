@@ -13,7 +13,7 @@ LibreOffice recalculation of the workbook reproduces these numbers:
   FCF_t       = revenue_t x FCFF margin,  PV = FCF_t / (1 + WACC)^(t - s)
                 s = years from the base period end to the price date (cash flows already partly elapsed)
   TV          = FCF_N x (1 + g) / (WACC - g),  EV = sum(PV) + TV / (1 + WACC)^(N - s)
-  per share   = (EV - net debt) / shares outstanding
+  per share   = (EV - net debt) / diluted shares  (shares outstanding x latest diluted/basic weighted-average ratio)
 Sensitivity keeps the FCF path fixed and varies only WACC and g (same as the Excel sheet).
 Reverse DCF solves for the year-1 growth (or the WACC) at which the model value equals the price.
 """
@@ -213,6 +213,8 @@ def build(bundle: dict, a: DCFAssumptions | None = None, regime: RegimeOverlay |
     fin: pd.DataFrame = bundle["financials"].copy()
     px = bundle["prices"]["close"]
     price, shares = float(bundle["last_price"]), float(bundle["shares"])
+    dil = float(bundle.get("dilution_factor") or 1.0)
+    shares_d = shares * dil                       # per-share values; market cap / WACC weights use basic shares
     notes: list[str] = []
 
     def fcff(cfo, capex, interest):
@@ -291,7 +293,7 @@ def build(bundle: dict, a: DCFAssumptions | None = None, regime: RegimeOverlay |
     wacc = w_e * ke + (1 - w_e) * kd_after
 
     inp = DCFInputs(base_rev, margin, g_high, a.terminal_growth, wacc, a.projection_years,
-                    debt - cash, shares, price, stub, a.growth_half_life)
+                    debt - cash, shares_d, price, stub, a.growth_half_life)
     base = value(inp)
     if base["tv_share_of_ev"] > 0.8:
         notes.append(f"Terminal value is {base['tv_share_of_ev']:.0%} of EV: highly sensitive to WACC and g.")
@@ -351,7 +353,9 @@ def build(bundle: dict, a: DCFAssumptions | None = None, regime: RegimeOverlay |
                         "weight_equity": w_e, "wacc": wacc, "growth_high_used": g_high, "growth_source": growth_src,
                         "revenue_cagr_hist": float(cagr), "fcf_margin_used": margin, "fcf_margin_source": margin_src,
                         "base_period": base_label, "base_period_end": base_end, "base_revenue": base_rev,
-                        "stub_years": stub, "balance_sheet_date": bs_date,
+                        "stub_years": stub, "balance_sheet_date": bs_date, "dilution_factor": dil,
+                        "dilution_period": bundle.get("dilution_period"), "shares_basic": shares,
+                        "shares_diluted": shares_d,
                         "implied_growth": g_impl, "implied_wacc": w_impl, "scenario_growth_delta": dg},
         "regime": ov.as_dict(),
         "inputs": asdict(inp), "base": base, "sensitivity": sens, "fomc_overlay": fomc, "scenarios": scen,
