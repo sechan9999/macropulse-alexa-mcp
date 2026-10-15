@@ -73,7 +73,9 @@ def rule_opinion(ctx: dict) -> dict:
     v, t, s, mf = ctx["valuation"], ctx["technical"], ctx["pattern_screen_daily"], ctx["money_flow"]
     score, basis = 0.0, []
     up = v["expected_upside"]
-    vs = 3 if up > 0.25 else 2 if up > 0.10 else -3 if up < -0.25 else -2 if up < -0.10 else 0
+    # Continuous: 1 point per 10% of upside, capped at +/-3. (A 0 / +/-2 step at +/-10% let a 2% change in
+    # inputs, e.g. share dilution, move the rating two notches.)
+    vs = round(float(np.clip(up * 10, -3.0, 3.0)), 2)
     if not v.get("scenarios_bracket_price", True):
         # The scenarios cannot reach the market price: the DCF inputs, not the market, are the likelier
         # error, so valuation must not single-handedly decide the rating.
@@ -81,7 +83,7 @@ def rule_opinion(ctx: dict) -> dict:
         basis.append(f"valuation {vs:+.1f} (prob-weighted upside {up:+.1%}; half weight: price outside the "
                      f"bear-bull range)")
     else:
-        basis.append(f"valuation {vs:+d} (prob-weighted upside {up:+.1%})")
+        basis.append(f"valuation {vs:+.1f} (prob-weighted upside {up:+.1%})")
     score += vs
     for tf, w in (("Monthly", 1.0), ("Weekly", 1.0), ("Daily", 0.5)):
         al = t[tf]["ma_alignment"]

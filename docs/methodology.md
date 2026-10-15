@@ -472,7 +472,7 @@ $$k_e = r_f + \beta\,(\text{ERP} + \Delta_{\text{regime}}), \qquad \text{WACC} =
 $$\text{EV} = \sum_{t=1}^{N}\frac{\text{FCF}_t}{(1+\text{WACC})^{t-s}} + \frac{\text{FCF}_N(1+g_\infty)}{(\text{WACC}-g_\infty)(1+\text{WACC})^{N-s}}, \qquad V/\text{share} = \frac{\text{EV} - \text{net debt}}{\text{shares}}$$
 $s$ = years from the base period end to the price date; net debt from the same quarter-end balance sheet. Shares are diluted: shares outstanding × (diluted ÷ basic weighted-average shares in the latest quarter), so RSUs and options count; market cap and WACC weights use basic shares.
 
-**Reverse DCF** — the year-1 growth $g_1^*$ (or WACC$^*$) at which $V/\text{share}$ equals the price, other inputs held. Bear/bull shift $g_1$ by $\pm\max(5\text{pp}, 0.3\,g_1)$; when the price lies outside the bear–bull range the rating gives valuation half weight.
+**Reverse DCF** — the year-1 growth $g_1^*$ (or WACC$^*$) at which $V/\text{share}$ equals the price, other inputs held. Bear/bull shift $g_1$ by $\pm\max(5\text{pp}, 0.3\,g_1)$; the rating's valuation score is continuous, $\text{clip}(10 \times \text{upside}, -3, 3)$, and gets half weight when the price lies outside the bear–bull range.
 
 **Regime-weighted expected value**
 $$\mathbb{E}[V] = \sum_{s\in\{\text{bear},\text{base},\text{bull}\}} p_s(\text{regime})\, V_s$$

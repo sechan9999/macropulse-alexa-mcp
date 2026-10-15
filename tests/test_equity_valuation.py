@@ -180,6 +180,27 @@ class TestRating(unittest.TestCase):
         self.assertIn("half weight", half["basis"])
 
 
+class TestContinuousValuationScore(unittest.TestCase):
+    def _score(self, up, bracket=True):
+        ctx = copy.deepcopy(analysis.analyze(synthetic.stock_bundle()).ctx)
+        ctx["valuation"]["expected_upside"], ctx["valuation"]["scenarios_bracket_price"] = up, bracket
+        base = copy.deepcopy(ctx)
+        base["valuation"]["expected_upside"] = 0.0
+        return analysis.rule_opinion(ctx)["score"] - analysis.rule_opinion(base)["score"]
+
+    def test_one_point_per_ten_percent_capped_at_three(self):
+        self.assertAlmostEqual(self._score(-0.12), -1.2)
+        self.assertAlmostEqual(self._score(0.05), 0.5)
+        self.assertAlmostEqual(self._score(-0.60), -3.0)
+        self.assertAlmostEqual(self._score(0.40), 3.0)
+
+    def test_no_cliff_at_ten_percent(self):
+        self.assertLess(abs(self._score(-0.101) - self._score(-0.099)), 0.05)
+
+    def test_half_weight_still_applies(self):
+        self.assertAlmostEqual(self._score(-0.12, bracket=False), -0.6)
+
+
 class TestBeta(unittest.TestCase):
     def test_blend_of_weekly_and_monthly(self):
         idx = synthetic.price_frame(n=1300, start=4000, drift=0.0004, vol=0.010, seed=5)
