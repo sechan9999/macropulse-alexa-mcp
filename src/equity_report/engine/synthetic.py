@@ -72,11 +72,14 @@ def stock_bundle(ticker: str = "DEMO") -> dict:
 def company_facts_fixture() -> dict:
     """A small hand-written EDGAR companyfacts document exercising the parser's edge cases:
     tag switch over time, restatement (later filing wins), quarterly rows mixed in, a September
-    fiscal year end, split debt tags, and two share classes."""
+    fiscal year end, split debt tags, two share classes, and a 10-Q for the first half of FY2026
+    (with its prior-year comparatives and quarter-end balance sheet) for the trailing-twelve-month base."""
+    q = dict(filed="2026-05-01", form="10-Q", fp="Q2")
+    ytd, ytd_prev = ("2025-09-28", "2026-03-28"), ("2024-09-29", "2025-03-29")
     def dur(start, end, val, filed, form="10-K", fp="FY"):
         return {"start": start, "end": end, "val": val, "filed": filed, "form": form, "fp": fp}
 
-    def ins(end, val, filed, form="10-K"):
+    def ins(end, val, filed, form="10-K", fp=None):
         return {"end": end, "val": val, "filed": filed, "form": form}
 
     return {"cik": 1234567, "entityName": "FIXTURE INC", "facts": {
@@ -93,14 +96,19 @@ def company_facts_fixture() -> dict:
                 dur("2024-09-29", "2025-09-27", 130.0, "2025-11-03"),
                 dur("2025-06-29", "2025-09-27", 35.0, "2025-11-03"),          # 3-month row: ignored
                 dur("2025-03-30", "2025-06-28", 32.0, "2025-08-01", form="10-Q", fp="Q3"),
+                dur(*ytd, 70.0, **q), dur(*ytd_prev, 60.0, **q),
+                dur("2025-12-28", "2026-03-28", 37.0, **q),                    # 3-month row: not the YTD
             ]}},
             "OperatingIncomeLoss": {"units": {"USD": [dur("2024-09-29", "2025-09-27", 40.0, "2025-11-03")]}},
             "NetIncomeLoss": {"units": {"USD": [dur("2024-09-29", "2025-09-27", 30.0, "2025-11-03"),
-                                                 dur("2023-10-01", "2024-09-28", 27.0, "2024-11-01")]}},
+                                                 dur("2023-10-01", "2024-09-28", 27.0, "2024-11-01"),
+                                                 dur(*ytd, 17.0, **q), dur(*ytd_prev, 14.0, **q)]}},
             "NetCashProvidedByUsedInOperatingActivities": {"units": {"USD": [
-                dur("2024-09-29", "2025-09-27", 38.0, "2025-11-03")]}},
+                dur("2024-09-29", "2025-09-27", 38.0, "2025-11-03"),
+                dur(*ytd, 22.0, **q), dur(*ytd_prev, 18.0, **q)]}},
             "PaymentsToAcquirePropertyPlantAndEquipment": {"units": {"USD": [
-                dur("2024-09-29", "2025-09-27", 9.0, "2025-11-03")]}},
+                dur("2024-09-29", "2025-09-27", 9.0, "2025-11-03"),
+                dur(*ytd, 5.0, **q), dur(*ytd_prev, 4.0, **q)]}},
             "EarningsPerShareDiluted": {"units": {"USD/shares": [
                 dur("2023-10-01", "2024-09-28", 2.70, "2024-11-01"),
                 dur("2024-09-29", "2025-09-27", 3.00, "2025-11-03"),
@@ -109,9 +117,13 @@ def company_facts_fixture() -> dict:
             "Assets": {"units": {"USD": [ins("2025-09-27", 300.0, "2025-11-03")]}},
             "StockholdersEquity": {"units": {"USD": [ins("2025-09-27", 120.0, "2025-11-03")]}},
             "LiabilitiesAndStockholdersEquity": {"units": {"USD": [ins("2025-09-27", 300.0, "2025-11-03")]}},
-            "CashAndCashEquivalentsAtCarryingValue": {"units": {"USD": [ins("2025-09-27", 25.0, "2025-11-03")]}},
-            "LongTermDebtNoncurrent": {"units": {"USD": [ins("2025-09-27", 50.0, "2025-11-03")]}},
-            "LongTermDebtCurrent": {"units": {"USD": [ins("2025-09-27", 5.0, "2025-11-03")]}},
+            "CashAndCashEquivalentsAtCarryingValue": {"units": {"USD": [ins("2025-09-27", 25.0, "2025-11-03"),
+                                                                         ins("2026-03-28", 30.0, **q)]}},
+            "LongTermDebtNoncurrent": {"units": {"USD": [ins("2025-09-27", 50.0, "2025-11-03"),
+                                                          ins("2026-03-28", 48.0, **q)]}},
+            "LongTermDebtCurrent": {"units": {"USD": [ins("2025-09-27", 5.0, "2025-11-03"),
+                                                       ins("2026-03-28", 4.0, **q)]}},
             "CommercialPaper": {"units": {"USD": [ins("2025-09-27", 2.0, "2025-11-03")]}},
-            "InterestExpense": {"units": {"USD": [dur("2024-09-29", "2025-09-27", 2.5, "2025-11-03")]}},
+            "InterestExpense": {"units": {"USD": [dur("2024-09-29", "2025-09-27", 2.5, "2025-11-03"),
+                                                  dur(*ytd, 1.4, **q), dur(*ytd_prev, 1.2, **q)]}},
         }}}

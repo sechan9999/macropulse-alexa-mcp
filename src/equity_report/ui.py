@@ -45,34 +45,41 @@ def market_view(macro_df) -> dict | None:
         return None
 
 
-def _generate_uncached(ticker: str, regime_label, regime_source, risk_free, erp, tg, provider, theme, market=None):
+def _generate_uncached(ticker: str, regime_label, regime_source, risk_free, erp, tg, provider, theme, market=None,
+                       overrides=None):
     from .engine.analysis import compact_summary
     from .engine.pipeline import run
     from .render import build_all
-    rep = run(ticker, assumptions=DCFAssumptions(equity_risk_premium=erp, terminal_growth=tg),
+    g1, margin, beta = overrides or (None, None, None)
+    rep = run(ticker, assumptions=DCFAssumptions(equity_risk_premium=erp, terminal_growth=tg, growth_high=g1,
+                                                 fcf_margin=margin, beta=beta),
               regime_label=regime_label, regime_source=regime_source, risk_free=risk_free, provider=provider,
               market=market)
     files = build_all(rep, dashboard_theme=theme)
     return {"files": files, "summary": compact_summary(rep), "issues": rep.issues, "method": rep.narrative_method}
 
 
-def _generate_by_day(ticker, regime_label, regime_source, risk_free, erp, tg, provider, theme, day, market=None):
-    return _generate_uncached(ticker, regime_label, regime_source, risk_free, erp, tg, provider, theme, market)
+def _generate_by_day(ticker, regime_label, regime_source, risk_free, erp, tg, provider, theme, day, market=None,
+                     overrides=None):
+    return _generate_uncached(ticker, regime_label, regime_source, risk_free, erp, tg, provider, theme, market,
+                              overrides)
 
 
 _CACHED = None
 
 
 def generate(st, ticker, regime_label=None, regime_source="", risk_free=None, erp=0.05, tg=0.025,
-             provider="auto", theme="dark", market=None):
-    """Cached per (inputs, calendar day) for 6 hours; raises UnsupportedFiler / DataUnavailable."""
+             provider="auto", theme="dark", market=None, overrides=None):
+    """Cached per (inputs, calendar day) for 6 hours; raises UnsupportedFiler / DataUnavailable.
+    overrides = (year-1 growth, FCFF margin, beta); None entries use the data-driven defaults."""
     global _CACHED
     if _CACHED is None:
         _CACHED = st.cache_data(ttl=6 * 3600, show_spinner=False, max_entries=24)(_generate_by_day)
     fn = _CACHED
     rf = None if risk_free is None else round(float(risk_free), 5)
+    ov = tuple(None if x is None else round(float(x), 5) for x in (overrides or (None, None, None)))
     return fn(ticker.upper().strip(), regime_label, regime_source, rf, round(erp, 5), round(tg, 5), provider, theme,
-              datetime.now().strftime("%Y-%m-%d"), market)
+              datetime.now().strftime("%Y-%m-%d"), market, ov)
 
 
 def download_row(st, res: dict, key: str) -> None:
@@ -127,6 +134,13 @@ def render_tab(st, components, macro_df=None, drift_df=None) -> None:
         tg = a2.number_input("Terminal growth", 0.0, 0.04, 0.025, 0.0025, format="%.4f", key="er_tg")
         rf_override = a3.number_input("Risk-free override (0 = live 10Y)", 0.0, 0.10, 0.0, 0.0025, format="%.4f",
                                       key="er_rf")
+        b1, b2, b3 = st.columns(3)
+        g1_ov = b1.number_input("Year-1 revenue growth (blank = latest 10-Q year-to-date)", -0.5, 3.0, None, 0.01,
+                                format="%.3f", key="er_g1", placeholder="auto")
+        m_ov = b2.number_input("FCFF margin (blank = trailing twelve months)", -0.5, 0.9, None, 0.01,
+                               format="%.3f", key="er_margin", placeholder="auto")
+        beta_ov = b3.number_input("Beta (blank = regression, Blume-adjusted)", 0.0, 4.0, None, 0.05,
+                                  format="%.2f", key="er_beta", placeholder="auto")
     rf = rf_override if rf_override > 0 else rf_live
     st.caption(f"Regime overlay: **{regime_label or 'Neutral (no live regime)'}** · {regime_src} · risk-free "
                f"{'%.2f%%' % (rf * 100) if rf else 'fallback 4.25%'} · touch-probability drift: "
@@ -142,7 +156,8 @@ def render_tab(st, components, macro_df=None, drift_df=None) -> None:
         with st.spinner(f"Pulling SEC filings and prices for {ticker}, running DCF and rendering files…"):
             try:
                 st.session_state["er_result"] = generate(st, ticker, regime_label, regime_src, rf, erp, tg,
-                                                         PROVIDERS[prov_label], market=market)
+                                                         PROVIDERS[prov_label], market=market,
+                                                         overrides=(g1_ov, m_ov, beta_ov))
                 st.session_state["er_error"] = None
             except Exception as e:  # noqa: BLE001
                 st.session_state["er_result"], st.session_state["er_error"] = None, (e, ticker)
@@ -165,6 +180,11 @@ def render_tab(st, components, macro_df=None, drift_df=None) -> None:
     m[4].metric("WACC", f"{s['wacc'] * 100:.2f}%", f"g {s['terminal_growth'] * 100:.1f}%")
     m[5].metric("Regime", s["macro_regime"]["regime"],
                 f"bear {s['macro_regime']['probs']['Bear']:.0%} / bull {s['macro_regime']['probs']['Bull']:.0%}")
+    if s.get("implied_growth_year1") is not None:
+        st.caption(f"Base {s['base_period']} · year-1 growth {s['growth_year1'] * 100:.1f}% · FCFF margin "
+                   f"{s['fcf_margin'] * 100:.1f}% · **reverse DCF: the price implies {s['implied_growth_year1'] * 100:.1f}% "
+                   "year-1 growth**" + ("" if s.get("scenarios_bracket_price", True)
+                                        else " · the bear–bull range does not contain the price, so valuation has half weight in the rating"))
     for issue in res["issues"]:
         st.warning(f"Data check: {issue}")
     download_row(st, res, "er")

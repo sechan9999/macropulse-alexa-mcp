@@ -102,7 +102,9 @@ def _fcf(val) -> go.Figure:
     fig = go.Figure()
     fig.add_trace(go.Bar(x=[f"FY{y}" for y in h.index], y=h["fcf"] / 1e6, name="FCF actual", marker_color=charts.SERIES[0],
                          hovertemplate="%{x}: $%{y:,.0f}m<extra></extra>"))
-    fig.add_trace(go.Bar(x=[f"FY{y0 + i + 1}E" for i in range(len(base["fcf"]))], y=base["fcf"] / 1e6,
+    ttm_base = str(val["assumptions"].get("base_period", "")).startswith("TTM")
+    fig.add_trace(go.Bar(x=[(f"Y{i + 1}E" if ttm_base else f"FY{y0 + i + 1}E") for i in range(len(base["fcf"]))],
+                         y=base["fcf"] / 1e6,
                          name="FCF projected (base)", marker_color=charts.SERIES[1],
                          hovertemplate="%{x}: $%{y:,.0f}m<extra></extra>"))
     fig.update_layout(height=320, margin=dict(l=10, r=10, t=10, b=10), bargap=0.35, font=FONT,
@@ -251,9 +253,12 @@ def build(rep: Report, *, theme: str | None = None, offline: bool = False) -> st
 <div><h2>Scenarios</h2><div class="card"><div class="scroll"><table><tr><th>Scenario</th><th>Value / share</th><th>vs. price</th>
 <th>Probability</th></tr>{scen}<tr><td><b>Weighted</b></td><td><b>{_usd(v['expected_per_share'])}</b></td>
 <td>{_pct(v['expected_upside'])}</td><td>100%</td></tr></table></div>
-<p class="note">Bear: growth −5pp, FCF margin ×0.8, WACC +1pp · Bull: the reverse. Inputs: risk-free {v['risk_free']:.2%}
-({html.escape(v['risk_free_source'])}), ERP {v['erp_used']:.2%}, growth {v['growth_high']:.1%} → {v['terminal_growth']:.1%},
-FCF margin {v['fcf_margin']:.1%}, terminal value {v['tv_share_of_ev']:.0%} of EV.</p>{notes}{issues}</div></div></section>
+<p class="note">Bear: year-1 growth −{-v['scenarios']['Bear']['d_growth'] * 100:.1f}pp, FCFF margin ×0.8, WACC +1pp · Bull: the
+reverse. Inputs: base {html.escape(str(v['base_period']))}, risk-free {v['risk_free']:.2%} ({html.escape(v['risk_free_source'])}),
+ERP {v['erp_used']:.2%}, year-1 growth {v['growth_high']:.1%} ({html.escape(str(v['growth_source']))}) → {v['terminal_growth']:.1%}
+by year {v['projection_years']}, FCFF margin {v['fcf_margin']:.1%}, terminal value {v['tv_share_of_ev']:.0%} of EV.
+<b>Reverse DCF:</b> the price implies year-1 growth {f"{v['implied_growth']:.1%}" if v.get('implied_growth') is not None else 'n/a'}
+or a WACC of {f"{v['implied_wacc']:.2%}" if v.get('implied_wacc') is not None else 'n/a'}.</p>{notes}{issues}</div></div></section>
 {_fomc(val, price)}
 <h2>Free cash flow: actual and projected</h2><div class="card">{_div(_fcf(val), 'fcf')}</div>
 <h2>Technical charts</h2><div class="card"><div class="tabs" role="tablist">
