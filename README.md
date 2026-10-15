@@ -26,6 +26,7 @@ Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **s
 ## 🔗 Live Deployments
 
 * **Demo video (YouTube)**: [https://youtu.be/ZG16Hc_mJDo](https://youtu.be/ZG16Hc_mJDo)
+* **Alexa+ voice demo (YouTube)**: [https://youtu.be/61LGgRkZlzU](https://youtu.be/61LGgRkZlzU) — Alexa+ answering through the MCP server
 * **Google Cloud Run (Serverless GCP Deployment)**: [https://macro-pulse-652787573242.us-central1.run.app](https://macro-pulse-652787573242.us-central1.run.app)
 * **Streamlit Community Cloud**: [https://hf-macro-dashboard.streamlit.app/](https://hf-macro-dashboard.streamlit.app/)
 * **GitHub Repository (source)**: [https://github.com/sechan9999/macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp)
