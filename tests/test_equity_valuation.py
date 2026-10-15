@@ -56,6 +56,15 @@ class TestTrailingTwelveMonths(unittest.TestCase):
         self.assertAlmostEqual(t["ytd_growth"], 70 / 60 - 1)
         self.assertEqual((t["cash"], t["debt"]), (30.0, 52.0))       # quarter-end balance sheet, 48 + 4
 
+    def test_interest_missing_from_the_10q_falls_back_to_the_fiscal_year(self):
+        facts = copy.deepcopy(self.facts)
+        rows = facts["facts"]["us-gaap"]["InterestExpense"]["units"]["USD"]
+        facts["facts"]["us-gaap"]["InterestExpense"]["units"]["USD"] = [r for r in rows if r["form"] != "10-Q"]
+        t = data_us.ttm(facts, data_us.annual_table(facts))
+        self.assertEqual(t["interest_expense"], 2.5)                  # FY2025, not 0
+        self.assertTrue(t["interest_expense_from_fy"])
+        self.assertFalse(data_us.ttm(self.facts, self.fin)["interest_expense_from_fy"])
+
     def test_no_10q_after_the_10k_means_no_ttm(self):
         facts = copy.deepcopy(self.facts)
         for tag in facts["facts"]["us-gaap"].values():

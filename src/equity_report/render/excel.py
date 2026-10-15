@@ -122,6 +122,9 @@ def build(rep: Report, chart_png: bytes | None = None) -> bytes:
             v = _num(t12[k])
             c = wf.cell(row=r, column=2 + ny, value=v / M if v is not None else None)
             c.font, c.number_format = _f(BLUE), F_M
+            if k == "interest_expense" and t12.get("interest_expense_from_fy"):
+                c.comment = Comment("No year-to-date interest in the 10-Q under the 10-K's tags: "
+                                    "last fiscal year's interest used.", "MacroPulse")
     if t12:
         c = wf.cell(row=5, column=2 + ny, value=f"10-Q {t12['period_end']}")
         c.font, c.alignment = _f(BLUE), Alignment(horizontal="right")
