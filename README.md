@@ -17,7 +17,7 @@
 * a self-hosted **MCP server for Alexa+** on Amazon ECS (9 tools over Streamable HTTP);
 * a **Fire TV app** (Expo + react-native-tvos) that reads the same AWS endpoint, **live on the [Amazon Appstore](https://www.amazon.com/gp/product/B0HKWHFJSS)**.
 
-**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 219 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns.  https://youtu.be/61LGgRkZlzU?si=MK3utiLev7Ca1XhR
+**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 219 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns.
 
 Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **scikit-learn**, **AWS (ECS, ECR, S3, Bedrock)** and **Google Gemini**.
 
@@ -25,10 +25,11 @@ Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **s
 
 ## 🔗 Live Deployments
 
+* **Demo video (YouTube)**: [https://youtu.be/ZG16Hc_mJDo](https://youtu.be/ZG16Hc_mJDo)
 * **Google Cloud Run (Serverless GCP Deployment)**: [https://macro-pulse-652787573242.us-central1.run.app](https://macro-pulse-652787573242.us-central1.run.app)
 * **Streamlit Community Cloud**: [https://hf-macro-dashboard.streamlit.app/](https://hf-macro-dashboard.streamlit.app/)
 * **GitHub Repository (source)**: [https://github.com/sechan9999/macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp)
-* **Deploy mirror for Streamlit Cloud**: [https://github.com/sechan9999/hf-macro-dashboard](https://github.com/sechan9999/hf-macro-dashboard) (read-only; synced from the source repo) https://youtu.be/61LGgRkZlzU?si=MK3utiLev7Ca1XhR
+* **Deploy mirror for Streamlit Cloud**: [https://github.com/sechan9999/hf-macro-dashboard](https://github.com/sechan9999/hf-macro-dashboard) (read-only; synced from the source repo)
 
 > **Where to make changes:** open PRs in [macropulse-alexa-mcp](https://github.com/sechan9999/macropulse-alexa-mcp). Every push to its `main` is mirrored into `hf-macro-dashboard` (the repo Streamlit Cloud deploys) by `.github/workflows/sync-hf-dashboard.yml` — one-way, `signals/` and `.github/workflows/` excluded (the push token has no `workflow` scope), so code edited directly in `hf-macro-dashboard` is overwritten on the next sync. Needs the Actions secret `HF_DASHBOARD_PUSH_TOKEN` (fine-grained PAT, Contents: read & write on `hf-macro-dashboard`).
 
