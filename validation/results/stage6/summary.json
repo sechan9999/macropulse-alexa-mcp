@@ -1,0 +1,274 @@
+{
+ "avgo_reported_not_tested": [
+  {
+   "excess_12m": 0.2654845266,
+   "rating": "Buy",
+   "upside": 3.20002,
+   "year": 2019
+  },
+  {
+   "excess_12m": 0.2775610447,
+   "rating": "Buy",
+   "upside": 1.445271,
+   "year": 2020
+  },
+  {
+   "excess_12m": 0.0490569158,
+   "rating": "Buy",
+   "upside": 1.257158,
+   "year": 2021
+  },
+  {
+   "excess_12m": 0.7800847304,
+   "rating": "Overweight",
+   "upside": 0.411908,
+   "year": 2022
+  },
+  {
+   "excess_12m": 0.85606463,
+   "rating": "Overweight",
+   "upside": -0.280543,
+   "year": 2023
+  },
+  {
+   "excess_12m": 0.3291391582,
+   "rating": "Overweight",
+   "upside": -0.547029,
+   "year": 2024
+  }
+ ],
+ "coverage": {
+  "excluded_financial_real_estate": 100,
+  "mapped_to_cik": 531,
+  "universe": 606,
+  "with_prices": 429
+ },
+ "damodaran": {
+  "engine_erp": 0.05,
+  "implied_erp": {
+   "column": "Implied ERP (FCFE)",
+   "implied_erp": 0.0423,
+   "sheet": "Historical Impl Premiums",
+   "year": 2025
+  },
+  "table": {
+   "AAPL": {
+    "damodaran_beta": 1.3503292086,
+    "damodaran_cost_of_capital": 0.0970707313,
+    "damodaran_industry": "Computers/Peripherals",
+    "engine_beta": 1.042763,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.093787,
+    "found": true
+   },
+   "AVGO": {
+    "damodaran_beta": 1.5181994029,
+    "damodaran_cost_of_capital": 0.1055061909,
+    "damodaran_industry": "Semiconductor",
+    "engine_beta": 1.593548,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.119248,
+    "found": true
+   },
+   "CAT": {
+    "damodaran_beta": 0.9636207903,
+    "damodaran_cost_of_capital": 0.0769956564,
+    "damodaran_industry": "Machinery",
+    "engine_beta": 1.23313,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.098273,
+    "found": true
+   },
+   "JNJ": {
+    "damodaran_beta": 0.9828330981,
+    "damodaran_cost_of_capital": 0.0784875117,
+    "damodaran_industry": "Drugs (Pharmaceutical)",
+    "engine_beta": 0.404458,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.059759,
+    "found": true
+   },
+   "KO": {
+    "damodaran_beta": 0.641468707,
+    "damodaran_cost_of_capital": 0.0632567158,
+    "damodaran_industry": "Beverage (Soft)",
+    "engine_beta": 0.462675,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.061947,
+    "found": true
+   },
+   "MSFT": {
+    "damodaran_beta": 1.2766481781,
+    "damodaran_cost_of_capital": 0.0934404807,
+    "damodaran_industry": "Software (System & Application)",
+    "engine_beta": 1.060763,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.095144,
+    "found": true
+   },
+   "NEE": {
+    "damodaran_beta": 0.4824326713,
+    "damodaran_cost_of_capital": 0.0501434076,
+    "damodaran_industry": "Power",
+    "engine_beta": 0.617982,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.061821,
+    "found": true
+   },
+   "UNP": {
+    "damodaran_beta": 0.9751457485,
+    "damodaran_cost_of_capital": 0.0726587934,
+    "damodaran_industry": "Transportation (Railroads)",
+    "engine_beta": 0.787576,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.074308,
+    "found": true
+   },
+   "WMT": {
+    "damodaran_beta": 0.8052405396,
+    "damodaran_cost_of_capital": 0.0726607086,
+    "damodaran_industry": "Retail (General)",
+    "engine_beta": 0.696439,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.074792,
+    "found": true
+   },
+   "XOM": {
+    "damodaran_beta": 0.2993819796,
+    "damodaran_cost_of_capital": 0.0507396659,
+    "damodaran_industry": "Oil/Gas (Integrated)",
+    "engine_beta": 0.382206,
+    "engine_erp": 0.05,
+    "engine_wacc": 0.059946,
+    "found": true
+   }
+  }
+ },
+ "errors": 74,
+ "extreme_outputs": {
+  "median_upside": 0.063542,
+  "name_years": 2173,
+  "upside_above_500pct": 169,
+  "upside_below_minus_95pct": 229
+ },
+ "h5": {
+  "by_rating": {
+   "Buy": {
+    "count": 528,
+    "mean": -0.0080992801,
+    "median": -0.0268892299
+   },
+   "Neutral": {
+    "count": 721,
+    "mean": -0.076056843,
+    "median": -0.1101627526
+   },
+   "Overweight": {
+    "count": 454,
+    "mean": -0.0218183847,
+    "median": -0.0468151733
+   },
+   "Sell": {
+    "count": 158,
+    "mean": -0.0279837252,
+    "median": -0.0992966299
+   },
+   "Underweight": {
+    "count": 306,
+    "mean": -0.0892176629,
+    "median": -0.1217336587
+   }
+  },
+  "mean_ic": -0.0202148525,
+  "note": "t from the Newey-West (1 lag) standard error of six yearly ICs; p from t(5).",
+  "observations": 2167,
+  "p_one_sided": 0.6364413448,
+  "t": -0.3691721478,
+  "yearly": {
+   "2019": {
+    "n": 331,
+    "rank_ic": -0.2744615374
+   },
+   "2020": {
+    "n": 344,
+    "rank_ic": -0.0017595887
+   },
+   "2021": {
+    "n": 360,
+    "rank_ic": 0.1993580197
+   },
+   "2022": {
+    "n": 371,
+    "rank_ic": -0.0508571523
+   },
+   "2023": {
+    "n": 377,
+    "rank_ic": 0.0404809383
+   },
+   "2024": {
+    "n": 384,
+    "rank_ic": -0.0340497949
+   }
+  },
+  "years": 6
+ },
+ "inputs_vs_fsds": {
+  "flagged_over_0_5pct": [
+   {
+    "engine": 3051000000.0,
+    "fsds": null,
+    "item": "interest_expense",
+    "note": "tag not found in FSDS for this filing",
+    "tag": "InterestExpenseNonoperating",
+    "ticker": "MSFT"
+   },
+   {
+    "engine": 1654000000.0,
+    "fsds": null,
+    "item": "interest_expense",
+    "note": "tag not found in FSDS for this filing",
+    "tag": "InterestExpense",
+    "ticker": "KO"
+   },
+   {
+    "engine": 25800000000.0,
+    "fsds": null,
+    "item": "revenue",
+    "note": "tag not found in FSDS for this filing",
+    "tag": "RevenueFromContractWithCustomerIncludingAssessedTax",
+    "ticker": "NEE"
+   },
+   {
+    "engine": 2070600000.0,
+    "fsds": null,
+    "item": "diluted_shares",
+    "note": "tag not found in FSDS for this filing",
+    "tag": "WeightedAverageNumberOfDilutedSharesOutstanding",
+    "ticker": "NEE"
+   }
+  ],
+  "items_checked": 41,
+  "not_on_statement_face": [
+   {
+    "item": "interest_expense",
+    "tag": "InterestExpenseNonoperating",
+    "ticker": "MSFT"
+   },
+   {
+    "item": "interest_expense",
+    "tag": "InterestExpense",
+    "ticker": "KO"
+   },
+   {
+    "item": "revenue",
+    "tag": "RevenueFromContractWithCustomerIncludingAssessedTax",
+    "ticker": "NEE"
+   },
+   {
+    "item": "diluted_shares",
+    "tag": "WeightedAverageNumberOfDilutedSharesOutstanding",
+    "ticker": "NEE"
+   }
+  ]
+ }
+}

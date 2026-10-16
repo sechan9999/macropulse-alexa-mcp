@@ -17,3 +17,6 @@ run_backtest.py
 
 # Forward log scores are committed by .github/workflows/forward-log.yml
 !validation/forward_log/scores.csv
+
+# Validation downloads too large to commit (hashes are in validation/data/raw/manifest.json)
+validation/data/cache/

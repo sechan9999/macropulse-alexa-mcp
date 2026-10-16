@@ -1,0 +1,5 @@
+method,confidence,months,exceedances,expected,kupiec_p,christoffersen_ind_p,conditional_coverage_p,es_z2,es_p,basel_zone
+gaussian,95,392,19,19.6,0.88887501,0.93391671,0.9868871,-0.14490044,0.2595,
+gaussian,99,392,9,3.92,0.027372158,0.1907257,0.037269028,-1.5119312,0.0125,yellow
+bootstrap,95,392,20,19.6,0.92637881,0.98080029,0.99545175,-0.12778671,0.285,
+bootstrap,99,392,8,3.92,0.0694216,0.14405507,0.066180372,-1.0781629,0.031,yellow

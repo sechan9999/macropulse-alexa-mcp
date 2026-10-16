@@ -1,0 +1,4 @@
+regime,months,mean_next_return,mean_next_vol,share_up
+Neutral 🟡,230,0.0047284824,0.17133965,0.5826087
+Risk-Off 🔴,146,0.016905941,0.25130117,0.64383562
+Risk-On 🟢,761,0.0051385567,0.12539282,0.60183968

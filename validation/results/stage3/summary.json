@@ -1,0 +1,298 @@
+{
+ "by_regime": {
+  "Neutral 🟡": {
+   "mean_next_return": 0.0047284824,
+   "mean_next_vol": 0.1713396519,
+   "months": 230,
+   "share_up": 0.5826086957
+  },
+  "Risk-Off 🔴": {
+   "mean_next_return": 0.0169059406,
+   "mean_next_vol": 0.2513011683,
+   "months": 146,
+   "share_up": 0.6438356164
+  },
+  "Risk-On 🟢": {
+   "mean_next_return": 0.0051385567,
+   "mean_next_vol": 0.1253928177,
+   "months": 761,
+   "share_up": 0.6018396846
+  }
+ },
+ "durations": {
+  "Neutral 🟡": {
+   "50%": 3.0,
+   "count": 44.0,
+   "max": 32.0,
+   "mean": 5.2272727273
+  },
+  "Risk-Off 🔴": {
+   "50%": 4.0,
+   "count": 19.0,
+   "max": 26.0,
+   "mean": 7.6842105263
+  },
+  "Risk-On 🟢": {
+   "50%": 6.0,
+   "count": 27.0,
+   "max": 353.0,
+   "mean": 28.1851851852
+  }
+ },
+ "h1": {
+  "ci95": [
+   0.4410580988,
+   0.8690343769
+  ],
+  "difference": 0.6460891959,
+  "n_a": 146,
+  "n_b": 761,
+  "one_sided": true,
+  "p_value": 9.999e-05,
+  "reps": 10000
+ },
+ "h1_alfred_spread": {
+  "ci95": [
+   0.4414914104,
+   0.8791055595
+  ],
+  "difference": 0.6506812262,
+  "n_a": 138,
+  "n_b": 758,
+  "one_sided": true,
+  "p_value": 9.999e-05,
+  "reps": 10000
+ },
+ "h1_product_2005": {
+  "ci95": [
+   0.2679279611,
+   0.9137723427
+  ],
+  "difference": 0.5696668817,
+  "n_a": 39,
+  "n_b": 151,
+  "one_sided": true,
+  "p_value": 0.00239976,
+  "reps": 10000
+ },
+ "hmm": {
+  "crosstab": {
+   "HMM stress state": {
+    "Neutral 🟡": 2,
+    "Risk-Off 🔴": 38,
+    "Risk-On 🟢": 1
+   },
+   "other HMM states": {
+    "Neutral 🟡": 228,
+    "Risk-Off 🔴": 108,
+    "Risk-On 🟢": 760
+   }
+  },
+  "hmm_stress_months_labelled_risk_off": 0.9268292683,
+  "note": "The HMM is fitted on 1931-2004 in one pass, so its labels are not point-in-time; it is a comparison of how the two methods partition the same months.",
+  "risk_off_in_hmm_stress_state": 0.2602739726,
+  "states_by_bic": 4,
+  "states_by_test_loglik": 4,
+  "table": {
+   "2": {
+    "bic": 2427.490713535,
+    "converged": true,
+    "test_loglik_per_month": -1.4537655386,
+    "train_loglik": -1169.6980613171
+   },
+   "3": {
+    "bic": 2493.9958586451,
+    "converged": true,
+    "test_loglik_per_month": -1.4516479246,
+    "train_loglik": -1169.0680989103
+   },
+   "4": {
+    "bic": 1559.5286953206,
+    "converged": true,
+    "test_loglik_per_month": -1.2771404492,
+    "train_loglik": -661.1754752938
+   }
+  },
+  "train_end": "2005-01-01"
+ },
+ "nber": {
+  "false_alarm_rate": 0.6232876712,
+  "hit_rate": 0.3416149068,
+  "median_lead_months": -8.0,
+  "recession_months": 161,
+  "recessions": [
+   {
+    "first_risk_off_within_12m": "1938-03-01",
+    "lead_months": -9,
+    "recession_start": "1937-06-01"
+   },
+   {
+    "first_risk_off_within_12m": null,
+    "lead_months": null,
+    "recession_start": "1945-03-01"
+   },
+   {
+    "first_risk_off_within_12m": null,
+    "lead_months": null,
+    "recession_start": "1948-12-01"
+   },
+   {
+    "first_risk_off_within_12m": null,
+    "lead_months": null,
+    "recession_start": "1953-08-01"
+   },
+   {
+    "first_risk_off_within_12m": null,
+    "lead_months": null,
+    "recession_start": "1957-09-01"
+   },
+   {
+    "first_risk_off_within_12m": null,
+    "lead_months": null,
+    "recession_start": "1960-05-01"
+   },
+   {
+    "first_risk_off_within_12m": "1970-12-01",
+    "lead_months": -11,
+    "recession_start": "1970-01-01"
+   },
+   {
+    "first_risk_off_within_12m": "1974-10-01",
+    "lead_months": -10,
+    "recession_start": "1973-12-01"
+   },
+   {
+    "first_risk_off_within_12m": "1980-04-01",
+    "lead_months": -2,
+    "recession_start": "1980-02-01"
+   },
+   {
+    "first_risk_off_within_12m": "1980-09-01",
+    "lead_months": 11,
+    "recession_start": "1981-08-01"
+   },
+   {
+    "first_risk_off_within_12m": null,
+    "lead_months": null,
+    "recession_start": "1990-08-01"
+   },
+   {
+    "first_risk_off_within_12m": "2001-12-01",
+    "lead_months": -8,
+    "recession_start": "2001-04-01"
+   },
+   {
+    "first_risk_off_within_12m": "2008-09-01",
+    "lead_months": -8,
+    "recession_start": "2008-01-01"
+   },
+   {
+    "first_risk_off_within_12m": "2020-03-01",
+    "lead_months": 0,
+    "recession_start": "2020-03-01"
+   }
+  ],
+  "recessions_flagged": 8,
+  "risk_off_months": 146,
+  "risk_off_rate_in_expansions": 0.0932377049
+ },
+ "next_return_off_minus_on": {
+  "ci95": [
+   -0.0018425191,
+   0.0250994911
+  ],
+  "difference": 0.011767384,
+  "n_a": 146,
+  "n_b": 761,
+  "one_sided": false,
+  "p_value": 0.0866913309,
+  "reps": 10000
+ },
+ "sample": {
+  "first": "1931-12-01",
+  "last": "2026-08-01",
+  "months": 1137
+ },
+ "sensitivity": {
+  "gmm": {
+   "2": {
+    "difference_highest_minus_lowest_spread_component": 0.3381550074,
+    "highest_occupied_component": 1,
+    "months_per_component": {
+     "0": 914,
+     "1": 103
+    },
+    "n_high": 103,
+    "n_low": 914,
+    "p_value": 0.00019998
+   },
+   "3": {
+    "difference_highest_minus_lowest_spread_component": 0.7319462765,
+    "highest_occupied_component": 2,
+    "months_per_component": {
+     "0": 742,
+     "1": 263,
+     "2": 12
+    },
+    "n_high": 12,
+    "n_low": 742,
+    "p_value": 0.0001009387
+   },
+   "4": {
+    "difference_highest_minus_lowest_spread_component": 0.4408085741,
+    "highest_occupied_component": 2,
+    "months_per_component": {
+     "0": 702,
+     "1": 254,
+     "2": 61
+    },
+    "n_high": 61,
+    "n_low": 702,
+    "p_value": 0.0009999
+   }
+  },
+  "z_warmup": {
+   "24": {
+    "difference": 0.6858369098,
+    "n_off": 158,
+    "n_on": 761,
+    "p_value": 9.999e-05
+   },
+   "36": {
+    "difference": 0.6460891959,
+    "n_off": 146,
+    "n_on": 761,
+    "p_value": 9.999e-05
+   },
+   "48": {
+    "difference": 0.5705915012,
+    "n_off": 134,
+    "n_on": 761,
+    "p_value": 9.999e-05
+   },
+   "60": {
+    "difference": 0.4926528525,
+    "n_off": 122,
+    "n_on": 761,
+    "p_value": 9.999e-05
+   }
+  }
+ },
+ "transition_matrix": {
+  "Neutral 🟡": {
+   "Neutral 🟡": 0.8086956522,
+   "Risk-Off 🔴": 0.0782608696,
+   "Risk-On 🟢": 0.1130434783
+  },
+  "Risk-Off 🔴": {
+   "Neutral 🟡": 0.1232876712,
+   "Risk-Off 🔴": 0.8698630137,
+   "Risk-On 🟢": 0.0068493151
+  },
+  "Risk-On 🟢": {
+   "Neutral 🟡": 0.0342105263,
+   "Risk-Off 🔴": 0.0,
+   "Risk-On 🟢": 0.9657894737
+  }
+ }
+}

@@ -1,0 +1,129 @@
+{
+ "bootstrap": {
+  "first": "1994-01-31",
+  "last": "2026-08-31",
+  "months": 392,
+  "var95": {
+   "christoffersen": {
+    "lr_cc": 0.0091172447,
+    "lr_ind": 0.0005791525,
+    "n00": 352,
+    "n01": 19,
+    "n10": 19,
+    "n11": 1,
+    "p_cc": 0.9954517524,
+    "p_ind": 0.9808002924
+   },
+   "es_test": {
+    "p_value": 0.285,
+    "simulations": 2000,
+    "z2": -0.1277867142
+   },
+   "kupiec": {
+    "exceedances": 20,
+    "expected": 19.6,
+    "lr": 0.0085380922,
+    "n": 392,
+    "p_value": 0.9263788115,
+    "rate": 0.0510204082
+   }
+  },
+  "var99": {
+   "basel": {
+    "cumulative_probability": 0.9814830832,
+    "exceedances": 8,
+    "n": 392,
+    "zone": "yellow"
+   },
+   "christoffersen": {
+    "lr_cc": 5.4307427226,
+    "lr_ind": 2.1340991528,
+    "n00": 376,
+    "n01": 7,
+    "n10": 7,
+    "n11": 1,
+    "p_cc": 0.0661803716,
+    "p_ind": 0.1440550671
+   },
+   "es_test": {
+    "p_value": 0.031,
+    "simulations": 2000,
+    "z2": -1.0781628941
+   },
+   "kupiec": {
+    "exceedances": 8,
+    "expected": 3.92,
+    "lr": 3.2966435698,
+    "n": 392,
+    "p_value": 0.0694215995,
+    "rate": 0.0204081633
+   }
+  }
+ },
+ "gaussian": {
+  "first": "1994-01-31",
+  "last": "2026-08-31",
+  "months": 392,
+  "var95": {
+   "christoffersen": {
+    "lr_cc": 0.0263992758,
+    "lr_ind": 0.0068754007,
+    "n00": 354,
+    "n01": 18,
+    "n10": 18,
+    "n11": 1,
+    "p_cc": 0.9868870953,
+    "p_ind": 0.9339167127
+   },
+   "es_test": {
+    "p_value": 0.2595,
+    "simulations": 2000,
+    "z2": -0.1449004379
+   },
+   "kupiec": {
+    "exceedances": 19,
+    "expected": 19.6,
+    "lr": 0.0195238751,
+    "n": 392,
+    "p_value": 0.8888750127,
+    "rate": 0.0484693878
+   }
+  },
+  "var99": {
+   "basel": {
+    "cumulative_probability": 0.9931758013,
+    "exceedances": 9,
+    "n": 392,
+    "zone": "yellow"
+   },
+   "christoffersen": {
+    "lr_cc": 6.5791852937,
+    "lr_ind": 1.7120029734,
+    "n00": 374,
+    "n01": 8,
+    "n10": 8,
+    "n11": 1,
+    "p_cc": 0.037269028,
+    "p_ind": 0.190725701
+   },
+   "es_test": {
+    "p_value": 0.0125,
+    "simulations": 2000,
+    "z2": -1.5119311662
+   },
+   "kupiec": {
+    "exceedances": 9,
+    "expected": 3.92,
+    "lr": 4.8671823203,
+    "n": 392,
+    "p_value": 0.0273721584,
+    "rate": 0.0229591837
+   }
+  }
+ },
+ "horizon_sessions": 21,
+ "method_notes": {
+  "bootstrap": "i.i.d. resampling of the same 252 daily log returns, 5,000 paths",
+  "gaussian": "live tool: GBM on 252 daily log returns, 5,000 paths, seed 42"
+ }
+}

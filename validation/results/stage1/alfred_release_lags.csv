@@ -1,0 +1,7 @@
+series,n_obs_with_real_time_dates,median_lag_days,max_lag_days,assumed_lag_days,share_published_later_than_assumed,revision_measure,share_revised,mean_abs_revision,max_abs_revision
+BAA,358,3,142,5,0.26815642,"level, percentage points",0.0023201856,3.866976e-05,0.03
+AAA,358,3,142,5,0.26815642,"level, percentage points",0.0046403712,7.733952e-05,0.03
+CPIAUCSL,357,15,30,15,0.46498599,"month-over-month growth, pp",0.67156348,0.053150993,0.32671827
+UNRATE,357,5,51,10,0.011204482,"level, percentage points",0.56038136,0.069279661,0.4
+INDPRO,358,16,64,18,0.011173184,"month-over-month growth, pp",0.99226006,0.69515344,9.8338679
+TB3MS,358,3,14,5,0.24301676,"level, percentage points",0.0017969452,1.7969452e-05,0.01

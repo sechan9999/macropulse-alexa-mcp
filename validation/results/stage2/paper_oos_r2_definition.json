@@ -1,0 +1,3 @@
+{
+ "text": "[Welch & Goyal 2008, page 7 of the PDF] Our OOS statistics are computed as R2 = 1 − MSEA MSEN ,  R 2 = R2 − (1 − R2) × {T − k T − 1 ) , /Delta1RMSE = √ MSEN − √ MSEA, MSE-F = (T − h + 1) × { MSEN − MSEA MSEA ) , (6) where h is the degree of overlap ( h = 1 for no overlap). MSE-F is McCracken’s (2004)F -statistic. It tests for equal MSE of the unconditional forecast and the conditional forecast (i.e., /Delta1MSE = 0).2 We generally do 2 Our earlier drafts a ..."
+}

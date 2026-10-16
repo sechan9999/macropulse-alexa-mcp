@@ -1,0 +1,274 @@
+{
+ "alfred:AAA": {
+  "bytes": 7141,
+  "committed": true,
+  "path": "validation/data/raw/alfred/AAA.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:19Z",
+  "sha256": "fb5860463719749966a2f031bbaf1f5815ea6af01d2b23d8a05ffcbcc39b1594",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=AAA&realtime_start=1776-07-04&realtime_end=9999-12-31"
+ },
+ "alfred:BAA": {
+  "bytes": 7199,
+  "committed": true,
+  "path": "validation/data/raw/alfred/BAA.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:19Z",
+  "sha256": "3811410c4dd1012467398181d2715d6ab17060d1ba36b0b98bcffdaded6380df",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=BAA&realtime_start=1776-07-04&realtime_end=9999-12-31"
+ },
+ "alfred:CPIAUCSL": {
+  "bytes": 20012,
+  "committed": true,
+  "path": "validation/data/raw/alfred/CPIAUCSL.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:20Z",
+  "sha256": "9cd0e6c3cd86983570e3fdbd48184bf048e593778ccff12e362a76ffa7402c77",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL&realtime_start=1776-07-04&realtime_end=9999-12-31"
+ },
+ "alfred:INDPRO": {
+  "bytes": 218909,
+  "committed": true,
+  "path": "validation/data/raw/alfred/INDPRO.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:24Z",
+  "sha256": "2ce1cced1df9e1a580b4e40a1451486885a7a19cb2bdab37c6ede82085d90619",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=INDPRO&realtime_start=1776-07-04&realtime_end=9999-12-31"
+ },
+ "alfred:TB3MS": {
+  "bytes": 6210,
+  "committed": true,
+  "path": "validation/data/raw/alfred/TB3MS.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:25Z",
+  "sha256": "4cd87325452c8ceb40015c21c3bc53c3083cda0d280e4d55243c73b29a9a60e9",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=TB3MS&realtime_start=1776-07-04&realtime_end=9999-12-31"
+ },
+ "alfred:UNRATE": {
+  "bytes": 12752,
+  "committed": true,
+  "path": "validation/data/raw/alfred/UNRATE.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:21Z",
+  "sha256": "723b7c38ad992bb333b07d4b409425a38df7e7c33bdc9eeb78d56e6bc33594bd",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=UNRATE&realtime_start=1776-07-04&realtime_end=9999-12-31"
+ },
+ "alfred:USREC": {
+  "bytes": 6016,
+  "committed": true,
+  "path": "validation/data/raw/alfred/USREC.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:25Z",
+  "sha256": "53f590c8948beba613c0fb13f90bf62db82c221905e01991bb8d031939b69251",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=USREC&realtime_start=1776-07-04&realtime_end=9999-12-31"
+ },
+ "damodaran:betas.xls": {
+  "bytes": 82432,
+  "committed": true,
+  "path": "validation/data/raw/damodaran/betas.xls",
+  "retrieved_at_utc": "2026-10-16T14:05:31Z",
+  "sha256": "fa5d91af58046937e2db27a764b077dde9d5414df5f69214328f163b940e42a5",
+  "url": "https://pages.stern.nyu.edu/~adamodar/pc/datasets/betas.xls"
+ },
+ "damodaran:histimpl.xls": {
+  "bytes": 113152,
+  "committed": true,
+  "path": "validation/data/raw/damodaran/histimpl.xls",
+  "retrieved_at_utc": "2026-10-16T14:05:32Z",
+  "sha256": "bb4d8da0a371a00af06172ec41dcef35a9ae30d6ab9c03d58ab5d2187e1e406f",
+  "url": "https://pages.stern.nyu.edu/~adamodar/pc/datasets/histimpl.xls"
+ },
+ "damodaran:wacc.xls": {
+  "bytes": 77312,
+  "committed": true,
+  "path": "validation/data/raw/damodaran/wacc.xls",
+  "retrieved_at_utc": "2026-10-16T14:05:31Z",
+  "sha256": "d38b149c731bba6847d077ef67c9a4bfa0a54f947ba480b2f9ea89f5451d39a6",
+  "url": "https://pages.stern.nyu.edu/~adamodar/pc/datasets/wacc.xls"
+ },
+ "fred:AAA": {
+  "bytes": 5140,
+  "committed": true,
+  "path": "validation/data/raw/fred/AAA.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:12Z",
+  "sha256": "d6801c117feb3e107316ffbedcd2e7fd570306505e510fe59f6100d525f6c43a",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=AAA"
+ },
+ "fred:BAA": {
+  "bytes": 5232,
+  "committed": true,
+  "path": "validation/data/raw/fred/BAA.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:11Z",
+  "sha256": "2c4ccec98ff6259ce6a81909e304fd045ac1b40e9ab771f5fba9ca8a23bfef59",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=BAA"
+ },
+ "fred:CPIAUCSL": {
+  "bytes": 4436,
+  "committed": true,
+  "path": "validation/data/raw/fred/CPIAUCSL.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:15Z",
+  "sha256": "74cdd4240851205431bef1b6260415655eb036300b696641884102f74d859cd4",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=CPIAUCSL"
+ },
+ "fred:DGS10": {
+  "bytes": 62576,
+  "committed": true,
+  "path": "validation/data/raw/fred/DGS10.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:17Z",
+  "sha256": "09e82ea1961e64a61a314ae84066bf6726440029381dac57769952c44e2c2511",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=DGS10"
+ },
+ "fred:INDPRO": {
+  "bytes": 7490,
+  "committed": true,
+  "path": "validation/data/raw/fred/INDPRO.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:16Z",
+  "sha256": "24b7716a4bd43f818710c5be94db2f4eaf9359ff82e295845957f314042875db",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=INDPRO"
+ },
+ "fred:NFCI": {
+  "bytes": 13864,
+  "committed": true,
+  "path": "validation/data/raw/fred/NFCI.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:18Z",
+  "sha256": "fa38e2c50db65cc6909deb65b36f2874de1b2a8bdb38eb9ffe444c655882b9f7",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=NFCI"
+ },
+ "fred:T10Y2Y": {
+  "bytes": 46569,
+  "committed": true,
+  "path": "validation/data/raw/fred/T10Y2Y.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:13Z",
+  "sha256": "72e19321a2a3b1613ba21a78a8bb3d23cfacb9cb58578dc0747ae290f5b75054",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=T10Y2Y"
+ },
+ "fred:TB3MS": {
+  "bytes": 4324,
+  "committed": true,
+  "path": "validation/data/raw/fred/TB3MS.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:16Z",
+  "sha256": "6d1d7410638df147be4e17c22194f17f60b30b0a7ec893d16a21e6d0f28436c4",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=TB3MS"
+ },
+ "fred:UNRATE": {
+  "bytes": 2968,
+  "committed": true,
+  "path": "validation/data/raw/fred/UNRATE.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:15Z",
+  "sha256": "72452cf9e23eca3e98ad53362335a14c3abcc47f925e64faf6aab7d1d53be519",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=UNRATE"
+ },
+ "fred:USREC": {
+  "bytes": 4699,
+  "committed": true,
+  "path": "validation/data/raw/fred/USREC.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:14Z",
+  "sha256": "4f0388f836ec8b0a66ecca1ee3a872d8661bed7642218335a20ecd1a10f0a515",
+  "url": "https://api.stlouisfed.org/fred/series/observations?series_id=USREC"
+ },
+ "fsds:2025q4": {
+  "bytes": 65830170,
+  "committed": false,
+  "path": "validation/data/cache/fsds/2025q4.zip",
+  "retrieved_at_utc": "2026-10-16T16:03:13Z",
+  "sha256": "2b36ac3850c022cf19edd882e31c3c453c7666677b9fdd2e1f7748fdb5768c6e",
+  "url": "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2025q4.zip"
+ },
+ "fsds:2026q1": {
+  "bytes": 85259424,
+  "committed": false,
+  "path": "validation/data/cache/fsds/2026q1.zip",
+  "retrieved_at_utc": "2026-10-16T16:03:40Z",
+  "sha256": "d18c01c615da8f5cd46273b0dacaeee5b1163f4089171da0f84153a5f3c362f6",
+  "url": "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2026q1.zip"
+ },
+ "fsds:2026q3": {
+  "bytes": 65148008,
+  "committed": false,
+  "path": "validation/data/cache/fsds/2026q3.zip",
+  "retrieved_at_utc": "2026-10-16T16:03:29Z",
+  "sha256": "b6ebdc56b78526a6423f5b99f6e355afcb0510e7264324300ee5f0d3bd1bad21",
+  "url": "https://www.sec.gov/files/dera/data/financial-statement-data-sets/2026q3.zip"
+ },
+ "goyal:predictors": {
+  "bytes": 1060718,
+  "committed": true,
+  "path": "validation/data/raw/goyal/PredictorData.xlsx",
+  "retrieved_at_utc": "2026-10-16T14:05:30Z",
+  "sha256": "be74347c37d387fcdeeaf1f24a1332a6382f47943dd331906a5f9de0a30fe480",
+  "url": "https://docs.google.com/spreadsheets/d/17mw_IpaiLFDrGnrPRQ2o1ugV5nJsZuD1/export?format=xlsx"
+ },
+ "kenfrench:ff3_daily": {
+  "bytes": 178184,
+  "committed": true,
+  "path": "validation/data/raw/kenfrench/ff3_daily.zip",
+  "retrieved_at_utc": "2026-10-16T14:05:29Z",
+  "sha256": "2f29e22546069914890a712680a6f81f3680ebc3543b52864484d209ca13a7db",
+  "url": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_daily_CSV.zip"
+ },
+ "kenfrench:ff3_monthly": {
+  "bytes": 13065,
+  "committed": true,
+  "path": "validation/data/raw/kenfrench/ff3_monthly.zip",
+  "retrieved_at_utc": "2026-10-16T14:05:29Z",
+  "sha256": "593f4fbef03181bc0b22ff6292f217689dd1fb79355049ca905d95b262040a66",
+  "url": "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_Factors_CSV.zip"
+ },
+ "paper:welch_goyal_2008": {
+  "bytes": 1087972,
+  "committed": false,
+  "path": "validation/data/cache/paper/welch_goyal_2008_rfs.pdf",
+  "retrieved_at_utc": "2026-10-16T15:44:05Z",
+  "sha256": "57ad3636290682b93dc52a2baabc9440d84ed76b2736a08a8ba7a014c6df5b7b",
+  "url": "https://www.ivo-welch.info/research/journalcopy/2008-rfs.pdf"
+ },
+ "sp500:history": {
+  "bytes": 44258,
+  "committed": true,
+  "path": "validation/data/raw/sp500/history.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:32Z",
+  "sha256": "e86d05df354fd232c99c76fa152e6b18bed15a614265cc1d8d848024877f2d4a",
+  "url": "https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes%20(Updated).csv"
+ },
+ "yahoo:SPY": {
+  "bytes": 82283,
+  "committed": true,
+  "path": "validation/data/raw/yahoo/SPY.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:27Z",
+  "sha256": "9fb3fcbee651b19c777aa7114fc8bf8ad826e0660c790de96de34cea4578f9f9",
+  "url": "yfinance:SPY?auto_adjust=True"
+ },
+ "yahoo:VBMFX": {
+  "bytes": 76577,
+  "committed": true,
+  "path": "validation/data/raw/yahoo/VBMFX.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:28Z",
+  "sha256": "475ee5f1773f98aaa5c6e11079340809348ee073e0d0fc9d6a46ab7f5d5ff574",
+  "url": "yfinance:VBMFX?auto_adjust=True"
+ },
+ "yahoo:^GSPC": {
+  "bytes": 145222,
+  "committed": true,
+  "path": "validation/data/raw/yahoo/GSPC.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:26Z",
+  "sha256": "6f15782d86255ca13b991470b46e6daebe280a02ea518e8736b6ad8007507123",
+  "url": "yfinance:^GSPC?auto_adjust=True"
+ },
+ "yahoo:^IRX": {
+  "bytes": 80069,
+  "committed": true,
+  "path": "validation/data/raw/yahoo/IRX.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:28Z",
+  "sha256": "7fc958908876a3ca1eb01dd8173f2234bf88983b5dfcce6ee720f4f4056372c4",
+  "url": "yfinance:^IRX?auto_adjust=True"
+ },
+ "yahoo:^TNX": {
+  "bytes": 86290,
+  "committed": true,
+  "path": "validation/data/raw/yahoo/TNX.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:28Z",
+  "sha256": "e14ef842b656cafc2891cda9192f4e620464b99834abc044c9dd9ca4393ce834",
+  "url": "yfinance:^TNX?auto_adjust=True"
+ },
+ "yahoo:^VIX": {
+  "bytes": 51025,
+  "committed": true,
+  "path": "validation/data/raw/yahoo/VIX.csv.gz",
+  "retrieved_at_utc": "2026-10-16T14:05:27Z",
+  "sha256": "c8484ba499f0298f0934f465d30237c581a7d2b3d4320582c5eafda7b5498254",
+  "url": "yfinance:^VIX?auto_adjust=True"
+ }
+}

@@ -1,0 +1,165 @@
+{
+ "alfred": {
+  "approximation": {
+   "AAA": {
+    "max_abs_difference": 0.65,
+    "mean_abs_difference": 0.0048467967,
+    "measure": "level",
+    "months_compared": 359,
+    "share_different": 0.0139275766
+   },
+   "BAA": {
+    "max_abs_difference": 0.52,
+    "mean_abs_difference": 0.0037604457,
+    "measure": "level",
+    "months_compared": 359,
+    "share_different": 0.0139275766
+   },
+   "CPIAUCSL": {
+    "max_abs_difference": 0.4380483637,
+    "mean_abs_difference": 0.057295826,
+    "measure": "12-month % change, pp",
+    "months_compared": 652,
+    "share_different": 0.9371165644
+   },
+   "INDPRO": {
+    "max_abs_difference": 19.3126381789,
+    "mean_abs_difference": 1.8741838872,
+    "measure": "12-month % change, pp",
+    "months_compared": 1196,
+    "share_different": 0.9991638796
+   },
+   "TB3MS": {
+    "max_abs_difference": 0.01,
+    "mean_abs_difference": 5.57103e-05,
+    "measure": "level",
+    "months_compared": 359,
+    "share_different": 0.0055710306
+   },
+   "UNRATE": {
+    "max_abs_difference": 0.4,
+    "mean_abs_difference": 0.0685,
+    "measure": "level",
+    "months_compared": 800,
+    "share_different": 0.5525
+   }
+  },
+  "release_lags": {
+   "AAA": {
+    "assumed_lag_days": 5,
+    "max_abs_revision": 0.03,
+    "max_lag_days": 142.0,
+    "mean_abs_revision": 7.73395e-05,
+    "median_lag_days": 3.0,
+    "n_obs_with_real_time_dates": 358,
+    "revision_measure": "level, percentage points",
+    "share_published_later_than_assumed": 0.2681564246,
+    "share_revised": 0.0046403712
+   },
+   "BAA": {
+    "assumed_lag_days": 5,
+    "max_abs_revision": 0.03,
+    "max_lag_days": 142.0,
+    "mean_abs_revision": 3.86698e-05,
+    "median_lag_days": 3.0,
+    "n_obs_with_real_time_dates": 358,
+    "revision_measure": "level, percentage points",
+    "share_published_later_than_assumed": 0.2681564246,
+    "share_revised": 0.0023201856
+   },
+   "CPIAUCSL": {
+    "assumed_lag_days": 15,
+    "max_abs_revision": 0.3267182656,
+    "max_lag_days": 30.0,
+    "mean_abs_revision": 0.0531509925,
+    "median_lag_days": 15.0,
+    "n_obs_with_real_time_dates": 357,
+    "revision_measure": "month-over-month growth, pp",
+    "share_published_later_than_assumed": 0.4649859944,
+    "share_revised": 0.6715634837
+   },
+   "INDPRO": {
+    "assumed_lag_days": 18,
+    "max_abs_revision": 9.8338679229,
+    "max_lag_days": 64.0,
+    "mean_abs_revision": 0.6951534423,
+    "median_lag_days": 16.0,
+    "n_obs_with_real_time_dates": 358,
+    "revision_measure": "month-over-month growth, pp",
+    "share_published_later_than_assumed": 0.0111731844,
+    "share_revised": 0.9922600619
+   },
+   "TB3MS": {
+    "assumed_lag_days": 5,
+    "max_abs_revision": 0.01,
+    "max_lag_days": 14.0,
+    "mean_abs_revision": 1.79695e-05,
+    "median_lag_days": 3.0,
+    "n_obs_with_real_time_dates": 358,
+    "revision_measure": "level, percentage points",
+    "share_published_later_than_assumed": 0.2430167598,
+    "share_revised": 0.0017969452
+   },
+   "UNRATE": {
+    "assumed_lag_days": 10,
+    "max_abs_revision": 0.4,
+    "max_lag_days": 51.0,
+    "mean_abs_revision": 0.069279661,
+    "median_lag_days": 5.0,
+    "n_obs_with_real_time_dates": 357,
+    "revision_measure": "level, percentage points",
+    "share_published_later_than_assumed": 0.0112044818,
+    "share_revised": 0.5603813559
+   }
+  }
+ },
+ "manifest_files": 34,
+ "manifest_problems": [],
+ "model_latest_vs_alfred": {
+  "start_1976": {
+   "forecast_correlation": 0.9973361121,
+   "mean_abs_forecast_difference_log": 0.0031930197,
+   "n_forecasts_alfred": 485,
+   "n_forecasts_latest": 485,
+   "oos_r2_alfred": -0.4676325122,
+   "oos_r2_latest": -0.458497123,
+   "regime_label_agreement": 0.9515260323,
+   "regime_months": 557,
+   "regime_score_correlation": 0.9892603757
+  },
+  "start_2005": {
+   "forecast_correlation": 0.9831450853,
+   "mean_abs_forecast_difference_log": 0.0071505563,
+   "n_forecasts_alfred": 143,
+   "n_forecasts_latest": 143,
+   "oos_r2_alfred": -0.2940240041,
+   "oos_r2_latest": -0.2944597334,
+   "regime_label_agreement": 0.9488372093,
+   "regime_months": 215,
+   "regime_score_correlation": 0.9921017641
+  }
+ },
+ "prices": {
+  "annualised_tracking_difference_pct": -0.1953186351,
+  "correlation": 0.9873638137,
+  "first": "1993-02-01",
+  "last": "2026-08-01",
+  "max_abs_diff_bp": 441.259433829,
+  "mean_diff_bp": -1.6276552928,
+  "months": 403,
+  "months_over_threshold": 372,
+  "note": "SPY tracks the S&P 500 (after fees); Ken French's market is the CRSP value-weighted universe of NYSE/AMEX/NASDAQ stocks. They are different portfolios, so monthly gaps above 5 bp are expected; the product's cash rate is the 3-month bill, Ken French's RF the 1-month bill.",
+  "rf_max_abs_diff_bp": 7.7767523197,
+  "rf_mean_diff_bp": -0.1787242738,
+  "rf_months": 403,
+  "sd_diff_bp": 70.2596115102,
+  "share_over_threshold": 0.9230769231,
+  "threshold_bp": 5.0
+ },
+ "schema": {
+  "failed_sources": [],
+  "missing_rate_exceeded": [],
+  "outliers_listed": 77,
+  "sources": 18
+ }
+}

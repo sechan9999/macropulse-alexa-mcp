@@ -1,0 +1,56 @@
+,ticker,item,engine,fsds,tag,on_statement,rel_diff,flag,adsh,fsds_quarter,note
+0,AVGO,revenue,6.3887e+10,6.3887e+10,RevenueFromContractWithCustomerExcludingAssessedTax,True,0,False,0001730168-25-000121,2025q4,
+1,AVGO,operating_cf,2.7537e+10,2.7537e+10,NetCashProvidedByUsedInOperatingActivities,True,0,False,0001730168-25-000121,2025q4,
+2,AVGO,capex,6.23e+08,6.23e+08,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0001730168-25-000121,2025q4,
+3,AVGO,interest_expense,3.21e+09,3.21e+09,InterestExpenseNonoperating,True,0,False,0001730168-25-000121,2025q4,
+4,AVGO,diluted_shares,4.853e+09,4.853e+09,WeightedAverageNumberOfDilutedSharesOutstanding,True,0,False,0001730168-25-000121,2025q4,
+5,AVGO,net_debt,4.8958e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+6,AAPL,revenue,4.16161e+11,4.16161e+11,RevenueFromContractWithCustomerExcludingAssessedTax,True,0,False,0000320193-25-000079,2025q4,
+7,AAPL,operating_cf,1.11482e+11,1.11482e+11,NetCashProvidedByUsedInOperatingActivities,True,0,False,0000320193-25-000079,2025q4,
+8,AAPL,capex,1.2715e+10,1.2715e+10,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0000320193-25-000079,2025q4,
+9,AAPL,diluted_shares,1.5004697e+10,1.5004697e+10,WeightedAverageNumberOfDilutedSharesOutstanding,True,0,False,0000320193-25-000079,2025q4,
+10,AAPL,net_debt,6.2723e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+11,MSFT,revenue,3.31839e+11,3.31839e+11,RevenueFromContractWithCustomerExcludingAssessedTax,True,0,False,0001193125-26-323660,2026q3,
+12,MSFT,operating_cf,1.82935e+11,1.82935e+11,NetCashProvidedByUsedInOperatingActivities,True,0,False,0001193125-26-323660,2026q3,
+13,MSFT,capex,1.15948e+11,1.15948e+11,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0001193125-26-323660,2026q3,
+14,MSFT,interest_expense,3.051e+09,,InterestExpenseNonoperating,False,,True,0001193125-26-323660,2026q3,tag not found in FSDS for this filing
+15,MSFT,diluted_shares,7.453e+09,7.453e+09,WeightedAverageNumberOfDilutedSharesOutstanding,True,0,False,0001193125-26-323660,2026q3,
+16,MSFT,net_debt,1.9359e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+17,XOM,revenue,3.32238e+11,3.32238e+11,Revenues,True,0,False,0000034088-26-000045,2026q1,
+18,XOM,operating_cf,5.197e+10,5.197e+10,NetCashProvidedByUsedInOperatingActivities,True,0,False,0000034088-26-000045,2026q1,
+19,XOM,capex,2.8358e+10,2.8358e+10,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0000034088-26-000045,2026q1,
+20,XOM,interest_expense,6.03e+08,6.03e+08,InterestExpense,True,0,False,0000034088-26-000045,2026q1,
+21,XOM,net_debt,3.2819e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+22,JNJ,revenue,9.4193e+10,9.4193e+10,RevenueFromContractWithCustomerExcludingAssessedTax,True,0,False,0000200406-26-000016,2026q1,
+23,JNJ,operating_cf,2.453e+10,2.453e+10,NetCashProvidedByUsedInOperatingActivities,True,0,False,0000200406-26-000016,2026q1,
+24,JNJ,capex,4.832e+09,4.832e+09,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0000200406-26-000016,2026q1,
+25,JNJ,interest_expense,9.71e+08,9.71e+08,InterestExpenseNonoperating,True,0,False,0000200406-26-000016,2026q1,
+26,JNJ,diluted_shares,2.4294e+09,2.4294e+09,WeightedAverageNumberOfDilutedSharesOutstanding,True,0,False,0000200406-26-000016,2026q1,
+27,JNJ,net_debt,3.0224e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+28,WMT,revenue,7.06413e+11,7.06413e+11,RevenueFromContractWithCustomerExcludingAssessedTax,True,0,False,0000104169-26-000055,2026q1,
+29,WMT,operating_cf,4.1565e+10,4.1565e+10,NetCashProvidedByUsedInOperatingActivities,True,0,False,0000104169-26-000055,2026q1,
+30,WMT,capex,2.6642e+10,2.6642e+10,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0000104169-26-000055,2026q1,
+31,WMT,interest_expense,2.318e+09,2.318e+09,InterestExpenseDebt,True,0,False,0000104169-26-000055,2026q1,
+32,WMT,diluted_shares,8.022e+09,8.022e+09,WeightedAverageNumberOfDilutedSharesOutstanding,True,0,False,0000104169-26-000055,2026q1,
+33,WMT,net_debt,3.4035e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+34,KO,revenue,4.7941e+10,4.7941e+10,Revenues,True,0,False,0001628280-26-010047,2026q1,
+35,KO,operating_cf,7.408e+09,7.408e+09,NetCashProvidedByUsedInOperatingActivities,True,0,False,0001628280-26-010047,2026q1,
+36,KO,capex,2.112e+09,2.112e+09,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0001628280-26-010047,2026q1,
+37,KO,interest_expense,1.654e+09,,InterestExpense,False,,True,0001628280-26-010047,2026q1,tag not found in FSDS for this filing
+38,KO,diluted_shares,4.313e+09,4.313e+09,WeightedAverageNumberOfDilutedSharesOutstanding,True,0,False,0001628280-26-010047,2026q1,
+39,KO,net_debt,3.5166e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+40,CAT,revenue,6.7589e+10,6.7589e+10,Revenues,True,0,False,0000018230-26-000008,2026q1,
+41,CAT,operating_cf,1.1739e+10,1.1739e+10,NetCashProvidedByUsedInOperatingActivities,True,0,False,0000018230-26-000008,2026q1,
+42,CAT,capex,2.821e+09,2.821e+09,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0000018230-26-000008,2026q1,
+43,CAT,diluted_shares,4.723e+08,4.723e+08,WeightedAverageNumberOfDilutedSharesOutstanding,True,0,False,0000018230-26-000008,2026q1,
+44,CAT,net_debt,2.623e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+45,NEE,revenue,2.58e+10,,RevenueFromContractWithCustomerIncludingAssessedTax,False,,True,0000753308-26-000015,2026q1,tag not found in FSDS for this filing
+46,NEE,operating_cf,1.2485e+10,1.2485e+10,NetCashProvidedByUsedInOperatingActivities,True,0,False,0000753308-26-000015,2026q1,
+47,NEE,diluted_shares,2.0706e+09,,WeightedAverageNumberOfDilutedSharesOutstanding,False,,True,0000753308-26-000015,2026q1,tag not found in FSDS for this filing
+48,NEE,net_debt,9.2199e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
+49,UNP,revenue,2.451e+10,2.451e+10,RevenueFromContractWithCustomerExcludingAssessedTax,True,0,False,0000100885-26-000037,2026q1,
+50,UNP,operating_cf,9.29e+09,9.29e+09,NetCashProvidedByUsedInOperatingActivities,True,0,False,0000100885-26-000037,2026q1,
+51,UNP,capex,3.791e+09,3.791e+09,PaymentsToAcquirePropertyPlantAndEquipment,True,0,False,0000100885-26-000037,2026q1,
+52,UNP,interest_expense,1.309e+09,1.309e+09,InterestExpenseNonoperating,True,0,False,0000100885-26-000037,2026q1,
+53,UNP,diluted_shares,5.959e+08,5.959e+08,WeightedAverageNumberOfDilutedSharesOutstanding,True,0,False,0000100885-26-000037,2026q1,
+54,UNP,net_debt,3.0548e+10,,debt - cash (annual table),,,False,,,derived; components checked through the debt and cash tags below
