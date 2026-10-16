@@ -17,7 +17,7 @@
 * a self-hosted **MCP server for Alexa+** on Amazon ECS (9 tools over Streamable HTTP);
 * a **Fire TV app** (Expo + react-native-tvos) that reads the same AWS endpoint, **live on the [Amazon Appstore](https://www.amazon.com/gp/product/B0HKWHFJSS)**.
 
-**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 250 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns. From October 2026 a monthly **forward log** records what the live models say before the outcome is known, under rules fixed in advance in [`docs/validation/preregistration.md`](docs/validation/preregistration.md).
+**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 253 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns. From October 2026 a monthly **forward log** records what the live models say before the outcome is known, under rules fixed in advance in [`docs/validation/preregistration.md`](docs/validation/preregistration.md).
 
 Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **scikit-learn**, **AWS (ECS, ECR, S3, Bedrock)** and **Google Gemini**.
 
