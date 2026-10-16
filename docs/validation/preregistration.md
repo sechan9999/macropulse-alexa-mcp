@@ -159,3 +159,12 @@ At one primary record a month, the first forward test (H1 regime) is due in 2028
 the first expected-return test in 2029, because each 12-month outcome takes a year to close. Until then
 the forward log is evidence that the forecasts existed before the outcomes, not yet evidence that they
 are right.
+
+## 6. Change log
+
+Model code changes after this document. Each one changes the model fingerprint, so forward records
+before and after it are separate samples.
+
+| Date | Change | Effect on the forward log |
+|---|---|---|
+| 2026-10-16 | Equity report: 52/53-week fiscal years (JNJ) and successor registrants (XOM). Both failed in the pilot record. | Only the pilot record is under the earlier fingerprint. No hypothesis, test or constant changed. |
