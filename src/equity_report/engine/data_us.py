@@ -12,6 +12,7 @@ the MCP server can route prices through its own TTL cache.
 """
 from __future__ import annotations
 
+import copy
 import threading
 import time
 from datetime import datetime, timedelta
@@ -75,6 +76,32 @@ def company_facts(cik: str, http_get: Callable[[str], dict] | None = None) -> di
     http_get = http_get or _sec_get_json
     return _cached(f"facts:{cik}", 6 * 3600,
                    lambda: http_get(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"))
+
+
+# A holding-company reorganization moves the ticker to a new registrant before that registrant has filed
+# a 10-K, while the annual history stays under the predecessor's CIK. Successor CIK -> predecessor CIK.
+PREDECESSOR_CIK = {
+    "0002115436": "0000034088",       # XOM: ExxonMobil Holdings Corp <- Exxon Mobil Corp
+}
+
+
+def merge_facts(successor: dict, predecessor: dict) -> dict:
+    """The successor's company facts with the predecessor's financial-statement rows added under every
+    concept. Where both report the same period, the later filing wins as it does for any restatement.
+    Cover-page facts (dei, e.g. shares outstanding) stay the successor's own: they describe the current
+    registrant. Rows both filers report identically are kept once."""
+    out = copy.deepcopy(successor)
+    for tax, concepts in predecessor.get("facts", {}).items():
+        if tax == "dei":
+            continue
+        dst = out.setdefault("facts", {}).setdefault(tax, {})
+        for tag, body in concepts.items():
+            units = dst.setdefault(tag, {}).setdefault("units", {})
+            for unit, rows in body.get("units", {}).items():
+                own = units.get(unit, [])
+                seen = {tuple(sorted(r.items())) for r in own}
+                units[unit] = [r for r in rows if tuple(sorted(r.items())) not in seen] + own
+    return out
 
 
 # ─────────────────────────── XBRL -> annual table ───────────────────────────
@@ -144,6 +171,9 @@ def annual_table(facts: dict, n_years: int = 5) -> pd.DataFrame:
         raise UnsupportedFiler("No US-GAAP facts (foreign filer using IFRS, or no XBRL financials).")
     rev = _series(usgaap, TAGS["revenue"], instant=False)
     if rev.empty:
+        if any(_rows(usgaap, tag, "USD") for tag in TAGS["revenue"]):
+            raise UnsupportedFiler("Revenue is only in 10-Q filings: this registrant has not filed a 10-K yet "
+                                   "(a new registrant, e.g. after a reorganization).")
         raise UnsupportedFiler("No annual USD revenue in 10-K filings (20-F/40-F filer or non-USD reporting?).")
     ends = list(rev.index[-n_years:])
     cols = {}
@@ -161,9 +191,18 @@ def annual_table(facts: dict, n_years: int = 5) -> pd.DataFrame:
     df["dividends"] = df["dividends"].abs()
     df = df.drop(columns=[c for c in df.columns if c.startswith("_")])
     df["fy_end"] = [e.date().isoformat() for e in ends]
-    df.index = [str(e.year) for e in ends]
+    df.index = [fiscal_year_label(e) for e in ends]
     df.index.name = "fiscal_year"
+    if df.index.duplicated().any():
+        raise DataUnavailable(f"Two 10-K fiscal years end in the same year ({', '.join(df['fy_end'])}).")
     return df
+
+
+def fiscal_year_label(end) -> str:
+    """The calendar year a fiscal year ends in, except a 52/53-week year ending in the first week of
+    January, which is named for the year before (JNJ: FY2022 ended 2023-01-01, FY2023 on 2023-12-31)."""
+    end = pd.Timestamp(end)
+    return str(end.year - 1 if end.month == 1 and end.day <= 7 else end.year)
 
 
 def shares_outstanding(facts: dict) -> float | None:
@@ -409,6 +448,9 @@ def load_bundle(ticker: str, years: int = 5, *, price_fetch: Callable[[str], pd.
     try:
         cik, name = cik_for(ticker, http_get)
         facts = company_facts(cik, http_get)
+        predecessor = PREDECESSOR_CIK.get(cik)
+        if predecessor:
+            facts = merge_facts(facts, company_facts(predecessor, http_get))
     except UnsupportedFiler:
         raise
     except Exception as e:
@@ -443,7 +485,10 @@ def load_bundle(ticker: str, years: int = 5, *, price_fetch: Callable[[str], pd.
         "splits_checked": splits is not None,
         "positioning": positioning(ticker) if with_positioning else None,
         "risk_free_live": risk_free,
-        "sources": ["Yahoo Finance (prices, splits)", f"SEC EDGAR XBRL 10-K (CIK {cik}, latest 10-K filed {last_filed})"]
+        "sources": ["Yahoo Finance (prices, splits)",
+                    f"SEC EDGAR XBRL 10-K (CIK {cik}"
+                    + (f", 10-K history from predecessor CIK {predecessor}" if predecessor else "")
+                    + f", latest 10-K filed {last_filed})"]
         + ([f"SEC EDGAR XBRL 10-Q (trailing twelve months to {t12['period_end']})"] if t12 else []),
         "as_of": str(prices.index[-1].date()),
         "fetched_at": datetime.now().isoformat(timespec="seconds"),
