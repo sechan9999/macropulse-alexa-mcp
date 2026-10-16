@@ -69,18 +69,37 @@ class AlexaMacroSkill:
         "broadcom": "AVGO", "costco": "COST", "eli lilly": "LLY", "lilly": "LLY", "visa": "V",
         "mastercard": "MA", "jpmorgan": "JPM", "jp morgan": "JPM", "walmart": "WMT", "home depot": "HD",
         "coca cola": "KO", "coca-cola": "KO", "exxon": "XOM", "chevron": "CVX", "unitedhealth": "UNH",
-        "johnson and johnson": "JNJ", "procter and gamble": "PG", "salesforce": "CRM", "adobe": "ADBE",
+        "johnson and johnson": "JNJ", "j and j": "JNJ", "procter and gamble": "PG", "exxonmobil": "XOM", "salesforce": "CRM", "adobe": "ADBE",
         "oracle": "ORCL", "intel": "INTC", "amd": "AMD", "micron": "MU", "berkshire": "BRK-B",
     }
     _TICKER_AFTER = re.compile(r"\b(?:on|for|of|about)\s+(?:the\s+)?\$?([a-z]{1,5}(?:[.-][a-z])?)\b", re.I)
     _NOT_TICKERS = {"the", "my", "a", "an", "me", "it", "this", "that", "tv", "stock", "shares", "today"}
 
+    # The company a request names: what follows "report on", "fair value of", "DCF for"...
+    _NAME_AFTER = re.compile(r"\b(?:on|for|of|about)\s+(?:the\s+)?(.+?)(?:\s+(?:on|to)\s+the\s+tv|\s+stock|\s+shares)?\s*[.?!]*$",
+                             re.I)
+
+    @staticmethod
+    def _spoken(text: str) -> str:
+        """Lower case, '&' read as 'and', dots dropped: 'Johnson & Johnson' and 'J.&J.' match the aliases."""
+        t = re.sub(r"\s*&\s*", " and ", text.lower()).replace(".", " ")
+        return re.sub(r"\s+", " ", t).strip()
+
+    @classmethod
+    def requested_company(cls, prompt: str) -> Optional[str]:
+        """The company name as spoken, or None when the request names none ('give me an equity report')."""
+        m = cls._NAME_AFTER.search(prompt.strip())
+        return m.group(1).strip() if m else None
+
     @classmethod
     def extract_equity_ticker(cls, prompt: str) -> Optional[str]:
-        p = prompt.lower()
+        p = cls._spoken(prompt)
         for name in sorted(cls.COMPANY_ALIASES, key=len, reverse=True):
             if re.search(rf"\b{re.escape(name)}\b", p):
                 return cls.COMPANY_ALIASES[name]
+        spelled = (cls._spoken(cls.requested_company(prompt) or "")).split()
+        if 2 <= len(spelled) <= 5 and all(len(w) == 1 and w.isalpha() for w in spelled):
+            return "".join(spelled).upper()                 # a ticker spelled out: "J N J" -> JNJ
         for m in cls._TICKER_AFTER.finditer(prompt):
             tok = m.group(1)
             if tok.lower() not in cls._NOT_TICKERS:
@@ -109,7 +128,12 @@ class AlexaMacroSkill:
 
         # Equity report (checked first: "show the Apple report on the TV" is still an equity report)
         if any(k in p_low for k in cls.EQUITY_KEYWORDS):
-            args["ticker"] = cls.extract_equity_ticker(prompt) or "AAPL"
+            ticker = cls.extract_equity_ticker(prompt)
+            if ticker is None and cls.requested_company(prompt):
+                args["ticker"] = None                      # a name we can't map: ask, never report on another stock
+                args["company"] = cls.requested_company(prompt)
+            else:
+                args["ticker"] = ticker or "AAPL"
             return "get_equity_report", args
 
         # Morning brief (after the equity check: "a market update on Apple" still wants the Apple report)
@@ -286,6 +310,20 @@ class AlexaMacroSkill:
         }
 
     @classmethod
+    def _error_result(cls, prompt: str, tool: str, title: str, subtitle: str, speech: str, error: str,
+                      message: str) -> Dict[str, Any]:
+        """A spoken, honest refusal in the same shape as a tool result (status "error")."""
+        return {
+            "status": "error", "prompt": prompt, "is_tv_request": False, "tool_selected": tool,
+            "tool_args": {}, "spoken_response": speech,
+            "display_card": {"title": title, "subtitle": subtitle, "badges": [], "sentiment": "neutral"},
+            "apl_document": cls.generate_apl_document(title=title, subtitle=subtitle, sentiment="neutral",
+                                                      badges=[], speech_text=speech),
+            "raw_payload": {"status": "error", "error": error, "message": message},
+            "latency_ms": 0, "timestamp": datetime.now().isoformat(),
+        }
+
+    @classmethod
     def execute(cls, prompt: str) -> Dict[str, Any]:
         """Dispatches prompt to a tool. If live market data is unavailable the result is an
         honest spoken error card (status "error"), never an answer from made-up numbers."""
@@ -294,35 +332,19 @@ class AlexaMacroSkill:
         except EquityReportUnsupported as e:
             speech = ("I can only build equity reports for US companies that file 10-K reports with the SEC. "
                       f"{str(e).split(':')[0]} isn't one of them, so I won't guess.")
-            card = {"title": "Equity report not available", "subtitle": str(e)[:120], "badges": [], "sentiment": "neutral"}
-            return {
-                "status": "error", "prompt": prompt, "is_tv_request": False, "tool_selected": "get_equity_report",
-                "tool_args": {}, "spoken_response": speech, "display_card": card,
-                "apl_document": cls.generate_apl_document(title=card["title"], subtitle=card["subtitle"],
-                                                          sentiment="neutral", badges=[], speech_text=speech),
-                "raw_payload": {"status": "error", "error": "unsupported_ticker", "message": str(e)},
-                "latency_ms": 0, "timestamp": datetime.now().isoformat(),
-            }
+            return cls._error_result(prompt, "get_equity_report", "Equity report not available", str(e)[:120],
+                                     speech, "unsupported_ticker", str(e))
         except MarketDataUnavailable as e:
             logging.getLogger("MacroPulse-AlexaSkill").warning("Market data unavailable: %s", e)
             speech = "I can't reach live market data right now, so I won't guess. Please try again in a minute."
-            card = {"title": "Market data unavailable", "subtitle": "Live data could not be fetched",
-                    "badges": [], "sentiment": "neutral"}
-            return {
-                "status": "error",
-                "prompt": prompt,
-                "is_tv_request": False,
-                "tool_selected": "market_data_unavailable",
-                "tool_args": {},
-                "spoken_response": speech,
-                "display_card": card,
-                "apl_document": cls.generate_apl_document(
-                    title=card["title"], subtitle=card["subtitle"], sentiment="neutral",
-                    badges=[], speech_text=speech),
-                "raw_payload": {"status": "error", "error": "market_data_unavailable", "message": str(e)},
-                "latency_ms": 0,
-                "timestamp": datetime.now().isoformat(),
-            }
+            return cls._error_result(prompt, "market_data_unavailable", "Market data unavailable",
+                                     "Live data could not be fetched", speech, "market_data_unavailable", str(e))
+        except Exception as e:                              # a bug must not end the Alexa session with no answer
+            logging.getLogger("MacroPulse-AlexaSkill").exception("Tool failed for prompt %r", prompt)
+            speech = "Something went wrong while building that answer, so I won't guess. Please try again later."
+            return cls._error_result(prompt, "internal_error", "MacroPulse could not answer",
+                                     "An internal error occurred", speech, "internal_error",
+                                     f"{type(e).__name__}: {e}"[:200])
 
     @classmethod
     def _execute(cls, prompt: str) -> Dict[str, Any]:
@@ -330,6 +352,13 @@ class AlexaMacroSkill:
         start_time = datetime.now()
         is_tv = args.get("is_tv_request", False)
         footer = None
+
+        if tool_name == "get_equity_report" and args.get("ticker") is None:
+            name = args.get("company", "that company")
+            speech = (f"I couldn't match {name} to a stock ticker, so I won't guess. "
+                      "Try the ticker, such as J N J, or a name like Johnson and Johnson.")
+            return cls._error_result(prompt, "get_equity_report", "Which company?", f"No ticker found for '{name}'",
+                                     speech, "unknown_company", name)
 
         if tool_name == "get_equity_report":
             raw = execute_get_equity_report(args.get("ticker", "AAPL"))
