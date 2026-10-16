@@ -975,15 +975,7 @@ async def health_endpoint(request):
             "messages": "/messages",
             "alexa_query": "/alexa/query"
         },
-        "available_tools": [
-            "get_macro_regime",
-            "get_rates_and_spreads",
-            "simulate_portfolio_risk",
-            "check_nvda_danger_zone",
-            "scan_quant_signals",
-            "get_expected_returns",
-            "simulate_fomc_shock"
-        ],
+        "available_tools": [name for name, _ in _LANDING_TOOLS],   # tests pin this to the registered tools
         "version": "1.0.0"
     })
 

@@ -168,3 +168,4 @@ before and after it are separate samples.
 | Date | Change | Effect on the forward log |
 |---|---|---|
 | 2026-10-16 | Equity report: 52/53-week fiscal years (JNJ) and successor registrants (XOM). Both failed in the pilot record. | Only the pilot record is under the earlier fingerprint. No hypothesis, test or constant changed. |
+| 2026-10-16 | `/health` lists the tools from the registered set instead of a hand-written list (it missed two). No forecast code changed. | Changes the fingerprint (`src/alexa_mcp_server.py` is a model file); still only the pilot record is under an earlier one. |
