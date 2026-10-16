@@ -1,0 +1,72 @@
+name: Validation
+
+# Historical validation, Stages 1-6 of docs/validation/preregistration.md. Downloads go to
+# validation/data/raw (committed, pinned by SHA-256 in manifest.json) and validation/data/cache
+# (SEC bulk data and the paper; cached between runs, not committed). Results are committed back to the
+# branch the run started on.
+on:
+  workflow_dispatch:
+    inputs:
+      steps:
+        description: "Steps to run (fetch stage1 ... stage6 report, or all)"
+        default: "all"
+      refetch:
+        description: "Download the raw sources again even if they are committed"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    if: github.repository == 'sechan9999/macropulse-alexa-mcp' && github.actor != 'macropulse-bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: validation/data/cache
+          key: validation-cache-${{ hashFiles('validation/stage6.py') }}
+          restore-keys: validation-cache-
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-validation.txt
+      - name: Fetch raw sources
+        if: ${{ inputs.refetch || hashFiles('validation/data/raw/manifest.json') == '' }}
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: python -m validation.run fetch
+      - name: Run validation
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: python -m validation.run ${{ inputs.steps || 'all' }}
+      - name: Commit results
+        if: success() || failure()
+        run: |
+          git config user.name "macropulse-bot"
+          git config user.email "actions@github.com"
+          tmp="$RUNNER_TEMP/out"; mkdir -p "$tmp"
+          cp -r validation/results validation/data/raw "$tmp"/ 2>/dev/null || true
+          cp docs/validation/report.md "$tmp"/ 2>/dev/null || true
+          for i in 1 2 3; do
+            git fetch origin "${GITHUB_REF_NAME}" && git reset -q --hard FETCH_HEAD
+            rm -rf validation/results && cp -r "$tmp/results" validation/results 2>/dev/null || true
+            rm -rf validation/data/raw && mkdir -p validation/data && cp -r "$tmp/raw" validation/data/raw 2>/dev/null || true
+            cp "$tmp/report.md" docs/validation/report.md 2>/dev/null || true
+            git add -f validation/results validation/data/raw docs/validation/report.md 2>/dev/null || true
+            git diff --cached --quiet && exit 0
+            git commit -q -m "chore(validation): results $(date -u +%FT%TZ)"
+            git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 10
+          done
+          exit 1

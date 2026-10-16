@@ -1,0 +1,4 @@
+execution,ann_return,sharpe,max_drawdown,months
+same close (product),0.069468117,0.24508667,-0.26229787,800
+one session later,0.067848927,0.22958199,-0.30927127,800
+one month later,0.066902902,0.21232629,-0.30169796,800

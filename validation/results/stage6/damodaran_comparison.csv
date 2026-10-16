@@ -1,0 +1,11 @@
+ticker,damodaran_industry,found,engine_beta,damodaran_beta,engine_wacc,damodaran_cost_of_capital,engine_erp
+AVGO,Semiconductor,True,1.593548,1.5181994,0.119248,0.10550619,0.05
+AAPL,Computers/Peripherals,True,1.042763,1.3503292,0.093787,0.097070731,0.05
+MSFT,Software (System & Application),True,1.060763,1.2766482,0.095144,0.093440481,0.05
+XOM,Oil/Gas (Integrated),True,0.382206,0.29938198,0.059946,0.050739666,0.05
+JNJ,Drugs (Pharmaceutical),True,0.404458,0.9828331,0.059759,0.078487512,0.05
+WMT,Retail (General),True,0.696439,0.80524054,0.074792,0.072660709,0.05
+KO,Beverage (Soft),True,0.462675,0.64146871,0.061947,0.063256716,0.05
+CAT,Machinery,True,1.23313,0.96362079,0.098273,0.076995656,0.05
+NEE,Power,True,0.617982,0.48243267,0.061821,0.050143408,0.05
+UNP,Transportation (Railroads),True,0.787576,0.97514575,0.074308,0.072658793,0.05

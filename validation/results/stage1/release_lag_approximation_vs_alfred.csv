@@ -1,0 +1,7 @@
+series,measure,months_compared,share_different,mean_abs_difference,max_abs_difference
+BAA,level,359,0.013927577,0.0037604457,0.52
+AAA,level,359,0.013927577,0.0048467967,0.65
+CPIAUCSL,"12-month % change, pp",652,0.93711656,0.057295826,0.43804836
+UNRATE,level,800,0.5525,0.0685,0.4
+INDPRO,"12-month % change, pp",1196,0.99916388,1.8741839,19.312638
+TB3MS,level,359,0.0055710306,5.5710306e-05,0.01

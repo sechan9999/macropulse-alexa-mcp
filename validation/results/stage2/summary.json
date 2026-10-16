@@ -1,0 +1,173 @@
+{
+ "full": {
+  "clark_west": {
+   "lags": 12,
+   "mean_f": -0.0065340658,
+   "n": 485,
+   "p_one_sided": 0.9897390142,
+   "stat": -2.3166652939
+  },
+  "first_origin": "1985-06-01",
+  "last_origin": "2025-10-01",
+  "n": 485,
+  "oos_r2": -0.458497123,
+  "pesaran_timmermann": {
+   "expected_by_chance": 0.4691295568,
+   "hit_rate": 0.3690721649,
+   "n": 485,
+   "p_one_sided": 0.9999988115,
+   "z": -4.7184024036
+  },
+  "subperiods": {
+   "1980s": {
+    "cw_p": 0.6443478369,
+    "cw_stat": -0.3701049069,
+    "n": 55,
+    "note": "",
+    "oos_r2": -0.3059259404
+   },
+   "1990s": {
+    "cw_p": 0.9170826879,
+    "cw_stat": -1.3857127798,
+    "n": 120,
+    "note": "",
+    "oos_r2": -1.2651137312
+   },
+   "2000s": {
+    "cw_p": 0.9756545458,
+    "cw_stat": -1.9712883034,
+    "n": 120,
+    "note": "",
+    "oos_r2": -0.4246281275
+   },
+   "2010s": {
+    "cw_p": 0.9635799123,
+    "cw_stat": -1.7938308238,
+    "n": 120,
+    "note": "",
+    "oos_r2": -0.4510229341
+   },
+   "2020+": {
+    "cw_p": 0.3423004974,
+    "cw_stat": 0.4061927307,
+    "n": 70,
+    "note": "",
+    "oos_r2": 0.0031071384
+   },
+   "expansion": {
+    "cw_p": 0.9954684893,
+    "cw_stat": -2.6096676935,
+    "n": 449,
+    "note": "",
+    "oos_r2": -0.5117865753
+   },
+   "recession": {
+    "cw_p": 0.9272632457,
+    "cw_stat": -1.455707453,
+    "n": 36,
+    "note": "",
+    "oos_r2": -0.3298798437
+   }
+  }
+ },
+ "goyal_welch": {
+  "adjusted_r2": true,
+  "fixes_after_first_run": [
+   "pre-1926 returns rebuilt from price and dividends (the file starts CRSP returns in 1926)",
+   "degrees-of-freedom adjusted OOS R² as in the table"
+  ],
+  "max_abs_diff_primary_pp": 0.5851877239,
+  "pass": false,
+  "sample_end": 2005,
+  "source": "Welch & Goyal (2008), RFS 21(4), Table 1, p. 1470; data: Goyal predictor file (Annual sheet)",
+  "tolerance_pp": 0.5
+ },
+ "leakage": {
+  "lookahead_placebo": {
+   "0": -0.458497123,
+   "1": -0.5182338362,
+   "2": -0.5026831101,
+   "3": -0.4684805089
+  },
+  "noise_correlation": -0.1175625678,
+  "noise_threshold": 0.1,
+  "permutation": {
+   "actual_oos_r2": -0.458497123,
+   "n_permutations": 1000,
+   "null_mean": -0.3307598599,
+   "null_p95": -0.0969241552,
+   "p_value": 0.8041958042
+  }
+ },
+ "product_2005": {
+  "clark_west": {
+   "lags": 12,
+   "mean_f": -9.16582e-05,
+   "n": 143,
+   "p_one_sided": 0.5096748821,
+   "stat": -0.0242537107
+  },
+  "first_origin": "2013-12-01",
+  "last_origin": "2025-10-01",
+  "n": 143,
+  "oos_r2": -0.2944597334,
+  "pesaran_timmermann": {
+   "expected_by_chance": 0.5735732799,
+   "hit_rate": 0.4545454545,
+   "n": 143,
+   "p_one_sided": 0.999605825,
+   "z": -3.3568530384
+  },
+  "subperiods": {
+   "1980s": {
+    "cw_p": null,
+    "cw_stat": null,
+    "n": 0,
+    "note": "fewer than 24 forecasts",
+    "oos_r2": null
+   },
+   "1990s": {
+    "cw_p": null,
+    "cw_stat": null,
+    "n": 0,
+    "note": "fewer than 24 forecasts",
+    "oos_r2": null
+   },
+   "2000s": {
+    "cw_p": null,
+    "cw_stat": null,
+    "n": 0,
+    "note": "fewer than 24 forecasts",
+    "oos_r2": null
+   },
+   "2010s": {
+    "cw_p": 0.5562301223,
+    "cw_stat": -0.1414179744,
+    "n": 73,
+    "note": "",
+    "oos_r2": -1.0082228024
+   },
+   "2020+": {
+    "cw_p": 0.4891123529,
+    "cw_stat": 0.0272946728,
+    "n": 70,
+    "note": "",
+    "oos_r2": -0.1027676229
+   },
+   "expansion": {
+    "cw_p": 0.670938377,
+    "cw_stat": -0.4425057836,
+    "n": 141,
+    "note": "",
+    "oos_r2": -0.4020410392
+   },
+   "recession": {
+    "cw_p": null,
+    "cw_stat": null,
+    "n": 2,
+    "note": "fewer than 24 forecasts",
+    "oos_r2": null
+   }
+  }
+ }
+}

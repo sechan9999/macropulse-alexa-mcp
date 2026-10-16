@@ -1,0 +1,7 @@
+# Extra packages for the historical validation (validation/, docs/validation/preregistration.md).
+# Not needed by the app, the MCP server or the offline test suite.
+pandera>=0.22
+arch>=7.0
+hmmlearn>=0.3.2
+xlrd>=2.0.1
+pypdf>=4.0
