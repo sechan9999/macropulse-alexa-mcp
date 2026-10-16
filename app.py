@@ -2535,40 +2535,14 @@ with tab12:
     st.markdown("#### 🗣️ Spoken Voice Prompt Simulation")
     st.caption("Click a preset voice invocation or type a custom command as if speaking to Alexa+ on your Echo or Fire TV:")
 
-    col_p1, col_p2, col_p3, col_p4, col_p5, col_p6, col_p7 = st.columns(7)
-    preset_prompt = None
-
-    with col_p1:
-        if st.button("🟢 'Market Regime'", use_container_width=True):
-            preset_prompt = "Alexa, ask MacroPulse for today's market regime"
-    with col_p2:
-        if st.button("📺 'Show NVDA on TV'", use_container_width=True):
-            preset_prompt = "Alexa, show the NVDA Danger Zone on the TV"
-    with col_p3:
-        if st.button("⚡ 'FOMC Shock Test'", use_container_width=True):
-            preset_prompt = "Alexa, run an FOMC rate shock test on my portfolio"
-    with col_p4:
-        if st.button("🎲 '99% VaR Sim'", use_container_width=True):
-            preset_prompt = "Alexa, run a 99% risk simulation on SPY over the next 30 days"
-    with col_p5:
-        if st.button("⚡ 'Vol Breakout'", use_container_width=True):
-            preset_prompt = "Alexa, scan volatility squeeze breakouts on SPY"
-    with col_p6:
-        if st.button("📑 'AAPL Report'", use_container_width=True):
-            preset_prompt = "Alexa, give me an equity report on AAPL"
-    with col_p7:
-        if st.button("🌅 'Morning Brief'", use_container_width=True):
-            preset_prompt = "Alexa, ask MacroPulse for my morning brief"
-
-    # Input prompt text
-    default_text = preset_prompt if preset_prompt else "Alexa, what is today's market regime?"
-    user_query = st.text_input("Spoken Voice Input:", value=default_text, key="alexa_prompt_input")
+    from src.alexa_prompt_ui import prompt_controls
+    user_query, preset_clicked = prompt_controls(st)
 
     col_btn, col_empty = st.columns([1, 4])
     with col_btn:
         run_query = st.button("🎙️ Dispatch to Alexa+", type="primary", use_container_width=True)
 
-    if (run_query or preset_prompt) and _SKILL_OK:
+    if (run_query or preset_clicked) and _SKILL_OK:
         with st.spinner("⚡ Alexa+ querying MacroPulse MCP tools over Streamable HTTP..."):
             res = AlexaMacroSkill.execute(user_query)
 
