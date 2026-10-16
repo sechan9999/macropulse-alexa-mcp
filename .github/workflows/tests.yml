@@ -31,3 +31,16 @@ jobs:
 
       - name: Run tests
         run: python -m pytest -q --ignore=tests/test_alexa_mcp.py
+
+      # The forward log (docs/validation/preregistration.md) is append-only: a pull request may add
+      # records but not change or remove the ones already on the base branch.
+      - name: Forward log is append-only
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --depth=1 origin "${{ github.base_ref }}"
+          if git cat-file -e FETCH_HEAD:validation/forward_log/log.jsonl 2>/dev/null; then
+            git show FETCH_HEAD:validation/forward_log/log.jsonl > "$RUNNER_TEMP/base_log.jsonl"
+            python -m validation.forward_log verify --base "$RUNNER_TEMP/base_log.jsonl"
+          else
+            python -m validation.forward_log verify
+          fi

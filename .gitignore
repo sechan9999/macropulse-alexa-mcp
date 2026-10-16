@@ -14,3 +14,6 @@ data/
 src/__pycache__/
 macro_pulse_app_fixed.py
 run_backtest.py
+
+# Forward log scores are committed by .github/workflows/forward-log.yml
+!validation/forward_log/scores.csv

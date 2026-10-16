@@ -17,7 +17,7 @@
 * a self-hosted **MCP server for Alexa+** on Amazon ECS (9 tools over Streamable HTTP);
 * a **Fire TV app** (Expo + react-native-tvos) that reads the same AWS endpoint, **live on the [Amazon Appstore](https://www.amazon.com/gp/product/B0HKWHFJSS)**.
 
-**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 219 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns.
+**Point-in-time by design.** The regime score and the expected-return model only use data that was available at each date: expanding z-scores, and a 12-month training embargo before each forecast. When FRED or Yahoo data is unavailable, the app and the voice tools say so instead of substituting made-up numbers. CI runs 241 offline tests, including a noise leakage test that fails if the forecast model shows any skill on pure-noise returns. From October 2026 a monthly **forward log** records what the live models say before the outcome is known, under rules fixed in advance in [`docs/validation/preregistration.md`](docs/validation/preregistration.md).
 
 Built with **Streamlit**, **Plotly**, **yfinance**, **FRED**, **SEC EDGAR**, **scikit-learn**, **AWS (ECS, ECR, S3, Bedrock)** and **Google Gemini**.
 
@@ -218,6 +218,7 @@ python -m pytest -q tests/test_alexa_mcp.py            # live-data smoke test of
 ```
 * **Noise leakage test** (`tests/test_leakage.py`): returns are pure noise and features are persistent AR(1) noise, so nothing can be forecast. The model's out-of-sample correlation must stay below 0.10; the pre-fix model scores +0.20 to +0.32, and a second test checks that the check still catches it.
 * **Point-in-time tests** (`tests/test_macro_model.py`, `tests/test_mcp_regime.py`): rewriting data after a date must not change the regime, forecast or error band computed at that date. The MCP regime must match the dashboard's model and must not depend on VIX.
+* **Forward log** (`validation/`, `tests/test_forward_log.py`): on the 1st of each month `.github/workflows/forward-log.yml` records the live regime, the 12-month expected return and its benchmark, the strategy's next position, the SPY VaR and five equity reports, with SHA-256 snapshots of the inputs, in a hash-chained file. CI rejects any edit to a past record. Forecasts are scored only after their outcome window closes, and no hypothesis test runs before the pre-registered minimum sample.
 * **No made-up numbers**: tests cover Yahoo and FRED outages for the MCP tools, the Fire TV API and the AI briefing.
 
 ---

@@ -1,0 +1,62 @@
+name: Forward Log
+
+# Records what the live models say once a month, before the outcome is known, and scores every
+# forecast whose outcome window has closed (docs/validation/preregistration.md, section 5).
+# 12:17 UTC on the 1st is before the US open in both summer and winter, so the record is never "late".
+# Secrets: SEC_USER_AGENT (needed for the equity reports; without it they are logged as errors) and
+# FRED_API_KEY (optional; the keyless FRED CSV endpoint is used without it).
+on:
+  schedule:
+    - cron: "17 12 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: forward-log
+  cancel-in-progress: false
+
+jobs:
+  forward-log:
+    if: github.repository == 'sechan9999/macropulse-alexa-mcp'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Append this month's forecasts
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python -m validation.forward_log append
+
+      - name: Verify the log
+        run: python -m validation.forward_log verify
+
+      - name: Score matured forecasts
+        run: python -m validation.score_forward_log
+
+      - name: Publish summary
+        run: cat validation/forward_log/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit
+        run: |
+          git config user.name "macropulse-bot"
+          git config user.email "actions@github.com"
+          git add validation/forward_log
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(forward-log): record and scores $(date -u +%F)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
