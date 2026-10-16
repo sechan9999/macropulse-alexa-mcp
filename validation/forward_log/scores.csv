@@ -1,0 +1,9 @@
+seq,as_of,model_fingerprint,component,key,forecast,outcome,horizon_end,status,primary,late,rating
+0,2026-10-15,7ce94697f203,regime,Risk-On 🟢,-1.47,,,pending,,,
+0,2026-10-15,7ce94697f203,expected_return,S&P 500 12m,0.09487129786626368,,,pending,,,
+0,2026-10-15,7ce94697f203,backtest_position,2026-11,1.0,,,pending,,,
+0,2026-10-15,7ce94697f203,var_95,SPY,-4.52,,,pending,,,
+0,2026-10-15,7ce94697f203,var_99,SPY,-6.77,,,pending,,,
+0,2026-10-15,7ce94697f203,equity,AAPL,-0.370859,,,pending,,,Neutral
+0,2026-10-15,7ce94697f203,equity,AVGO,-0.154747,,,pending,,,Underweight
+0,2026-10-15,7ce94697f203,equity,WMT,-0.658613,,,pending,,,Neutral
