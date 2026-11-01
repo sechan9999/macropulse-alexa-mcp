@@ -1,9 +1,19 @@
 seq,as_of,model_fingerprint,component,key,forecast,outcome,horizon_end,status,primary,late,rating
-0,2026-10-15,7ce94697f203,regime,Risk-On 🟢,-1.47,,,pending,,,
-0,2026-10-15,7ce94697f203,expected_return,S&P 500 12m,0.09487129786626368,,,pending,,,
-0,2026-10-15,7ce94697f203,backtest_position,2026-11,1.0,,,pending,,,
-0,2026-10-15,7ce94697f203,var_95,SPY,-4.52,,,pending,,,
-0,2026-10-15,7ce94697f203,var_99,SPY,-6.77,,,pending,,,
-0,2026-10-15,7ce94697f203,equity,AAPL,-0.370859,,,pending,,,Neutral
-0,2026-10-15,7ce94697f203,equity,AVGO,-0.154747,,,pending,,,Underweight
-0,2026-10-15,7ce94697f203,equity,WMT,-0.658613,,,pending,,,Neutral
+0,2026-10-15,7ce94697f203,regime,Risk-On 🟢,-1.47,,,pending,False,False,
+0,2026-10-15,7ce94697f203,expected_return,S&P 500 12m,0.09487129786626368,,,pending,False,False,
+0,2026-10-15,7ce94697f203,backtest_position,2026-11,1.0,,,pending,False,False,
+0,2026-10-15,7ce94697f203,var_95,SPY,-4.52,,,pending,False,False,
+0,2026-10-15,7ce94697f203,var_99,SPY,-6.77,,,pending,False,False,
+0,2026-10-15,7ce94697f203,equity,AAPL,-0.370859,,,pending,False,False,Neutral
+0,2026-10-15,7ce94697f203,equity,AVGO,-0.154747,,,pending,False,False,Underweight
+0,2026-10-15,7ce94697f203,equity,WMT,-0.658613,,,pending,False,False,Neutral
+1,2026-10-30,f5b214a01055,regime,Risk-On 🟢,-1.44,,,pending,,,
+1,2026-10-30,f5b214a01055,expected_return,S&P 500 12m,0.09248873301674145,,,pending,,,
+1,2026-10-30,f5b214a01055,backtest_position,2026-11,1.0,,,pending,,,
+1,2026-10-30,f5b214a01055,var_95,SPY,-5.0,,,pending,,,
+1,2026-10-30,f5b214a01055,var_99,SPY,-7.25,,,pending,,,
+1,2026-10-30,f5b214a01055,equity,AAPL,-0.347736,,,pending,,,Neutral
+1,2026-10-30,f5b214a01055,equity,AVGO,-0.090538,,,pending,,,Underweight
+1,2026-10-30,f5b214a01055,equity,JNJ,0.170132,,,pending,,,Buy
+1,2026-10-30,f5b214a01055,equity,WMT,-0.64627,,,pending,,,Neutral
+1,2026-10-30,f5b214a01055,equity,XOM,2.13485,,,pending,,,Buy
